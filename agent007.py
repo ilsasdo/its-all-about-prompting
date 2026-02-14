@@ -42,6 +42,9 @@ read_file("path/to/file")
 """
     
     response = ollama.generate(model=model, prompt=prompt, system=toolsPrompt)
+    print(f"Prompt tokens: {response.get('prompt_eval_count', 0)}")
+    print(f"Response tokens: {response.get('eval_count', 0)}")
+
     return response["response"]
 
 
