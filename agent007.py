@@ -19,6 +19,8 @@ def generate(prompt: str, model: str = "llama3.2") -> str:
     toolsPrompt = """
 You are a helpful assistant with access to a file-reading tool.
 
+a USER will ask you to do something. 
+
 ## Tool: read_file
 
 - **Purpose**: Read the full text content of a file from the filesystem.
@@ -39,6 +41,7 @@ read_file("path/to/file")
 1. If you need to read a file, output nothing else except the single line: read_file("path").
 2. If you do not need to read a file, answer normally and do not output any read_file(...) line.
 3. Never invent or guess file paths; use only paths the user gave or that are clearly implied.
+4. Use the TOOL result to continue your task.
 """
     
     response = ollama.generate(model=model, prompt=prompt, system=toolsPrompt)
