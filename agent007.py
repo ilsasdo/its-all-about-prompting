@@ -44,7 +44,7 @@ read_file("path/to/file")
 4. Use the TOOL result to continue your task.
 """
     
-    response = ollama.generate(model=model, prompt=prompt, system=toolsPrompt)
+    response = ollama.generate(model=model, prompt=prompt, system=toolsPrompt, options={"temperature": 0.4})
     print(f"Prompt tokens: {response.get('prompt_eval_count', 0)}")
     print(f"Response tokens: {response.get('eval_count', 0)}")
 
