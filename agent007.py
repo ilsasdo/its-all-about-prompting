@@ -76,7 +76,7 @@ def execute_tool(tool_name: str, argument: str) -> str:
         try:
             with open(argument, encoding="utf-8") as f:
                 file_content = f.read()
-                return f"Here is the requested file content: {file_content}, continue your task."
+                return f"Here is the content of file {argument}:\n{file_content}\nEND OF FILE"
         except FileNotFoundError:
             return f"Error: file not found: {argument}"
         except OSError as e:
@@ -104,6 +104,8 @@ if __name__ == "__main__":
     print(f"Model: {model}")
     print("Enter a prompt (or 'quit' / 'exit' to stop).\n")
 
+    conversation_history = []
+
     while True:
 
         if starting_prompt is None:
@@ -116,6 +118,9 @@ if __name__ == "__main__":
             print("Bye.")
             break
 
+        conversation_history.append({"role": "user", "content": prompt})
+
+        print(f"\033[90m{prompt}\033[0m")  # dark gray
         print("\nResponse:")
         response = generate(prompt, model=model)
         print(response)
@@ -129,7 +134,10 @@ if __name__ == "__main__":
                 result = execute_tool(tool_name, arg)
                 print("\nTool result:")
                 print(result)
-                starting_prompt = result
+                conversation_history.append({"role": "tool", "content": result})
+                starting_prompt = "\n\n".join(
+                    f"{msg['role'].upper()}: {msg['content']}" for msg in conversation_history
+                )
             else:
                 print("Skipped.")
 
