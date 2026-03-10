@@ -22,5 +22,4 @@ def generate(prompt):
     )
     return r.json()['response']
 
-# print(generate(read_rule() + "\nCan you explain recursion in one sentence?"))
 print(generate(read_rules() + "\nWrite a java test class that verifies a sum function"))
