@@ -2,8 +2,8 @@
 import requests
 
 def chat():
-    url = "http://localhost:11434/api/generate"
-    history = ""
+    url = "http://localhost:11434/api/chat"
+    history = []
     
     # ANSI color codes
     BLACK = "\033[30m"
@@ -18,32 +18,32 @@ def chat():
         if user_input.lower() in ['exit', 'quit']:
             break
             
-        # Append user input to history with USER: prefix
-        history += f"USER: {user_input}\n"
+        # Append user input to history
+        history.append({"role": "user", "content": user_input})
         
         try:
             r = requests.post(
                 url,
                 json={
                     "model": "llama3.2",
-                    "prompt": history + "SYSTEM: ",
+                    "messages": history,
                     "stream": False
                 }
             )
             r.raise_for_status()
             response_data = r.json()
-            assistant_response = response_data['response']
+            assistant_response = response_data['message']['content']
             
             print(f"{GREEN}Assistant: {assistant_response}{RESET}")
             
-            # Append assistant response to history with SYSTEM: prefix
-            history += f"SYSTEM: {assistant_response}\n"
+            # Append assistant response to history
+            history.append({"role": "assistant", "content": assistant_response})
             
         except Exception as e:
             print(f"Error: {e}")
-            # The last user message remains in history, but since it's a simple string, we could try to revert it or just leave it.
-            # To be consistent with previous approach, let's remove it if it failed.
-            history = history.rsplit(f"USER: {user_input}\n", 1)[0]
+            # Remove the last user message if it failed
+            if history and history[-1]["role"] == "user":
+                history.pop()
 
 if __name__ == "__main__":
     chat()
