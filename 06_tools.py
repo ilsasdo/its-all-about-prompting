@@ -12,6 +12,7 @@ def call_llm(messages, debug=False):
     payload = {
         "model": "llama3.2",
         "messages": messages,
+        "temperature": 0.4,
         "stream": False
     }
     
@@ -37,6 +38,21 @@ def load_rules(rules_dir_path: str = "./rules") -> list:
                 rules.append({"role": "system", "content": rule_content})
     return rules
 
+def read_file(path: str) -> str:
+    """Read the content of a file from disk."""
+    try:
+        return f"The following is the content of file {path}:\n\n{Path(path).read_text()}"
+    except Exception as e:
+        return f"Error reading file {path}: {e}"
+
+def write_file(path: str, content: str) -> str:
+    """Write content to a file on disk."""
+    try:
+        Path(path).write_text(content)
+        return f"File {path} written successfully."
+    except Exception as e:
+        return f"Error writing to file {path}: {e}"
+
 def chat(debug=False):
     history = load_rules()
     
@@ -56,13 +72,15 @@ Format the output as a numbered list with clear explanations for each step."""
 
     TOOLS_PROMPT = """You have access to two tools: 'read_file' and 'write_file'.
 
-1. 'read_file': Read the content of a file from disk.
-   To use it, respond with: {"type": "function", "function": {"name": "read_file", "parameters": {"path": "FILE_PATH"}}}
+1. 'read_file': Obtain the content of a file from disk.
+   To use it, respond with a correct json: {"name": "read_file", "parameters": {"path": "FILE_PATH"}}
 
 2. 'write_file': Write content to a file on disk.
-   To use it, respond with: {"type": "function", "function": {"name": "write_file", "parameters": {"path": "FILE_PATH", "content": "FILE_CONTENT"}}}
+   To use it, respond with a correct json: {"name": "write_file", "parameters": {"path": "FILE_PATH", "content": "FILE_CONTENT"}}
 
-When you need to use a tool, provide the required parameters in the JSON object."""
+When you need to use a tool, provide the required parameters in the JSON object and ANSWER ONLY with a single valid JSON string"""
+
+    history.append({"role": "system", "content": TOOLS_PROMPT})
 
     while True:
         user_input = input(f"{BLACK}You: ")
@@ -76,8 +94,6 @@ When you need to use a tool, provide the required parameters in the JSON object.
         elif user_input.strip().lower() == '/summarize':
             history.append({"role": "user", "content": SUMMARIZE_PROMPT})
             is_summarize = True
-        elif user_input.strip().lower() == '/tools':
-            history.append({"role": "user", "content": TOOLS_PROMPT})
         else:
             # Append user input to history
             history.append({"role": "user", "content": user_input})
@@ -91,6 +107,35 @@ When you need to use a tool, provide the required parameters in the JSON object.
             print(f"{GRAY}[Prompt: {prompt_tokens}, Response: {eval_tokens}, Total: {prompt_tokens + eval_tokens}]{RESET}")
             print(f"{GREEN}Assistant: {assistant_response}{RESET}")
             
+            # Detect tool call
+            try:
+                data = json.loads(assistant_response)
+                if data.get("name") == "read_file" or data.get("name") == "write_file":
+                    tool_name = data["name"]
+                    parameters = data.get("parameters", {})
+                    
+                    print(f"{GRAY}Tool call: {tool_name}({parameters}){RESET}")
+                    
+                    if tool_name == "read_file":
+                        result = read_file(parameters.get("path"))
+                    elif tool_name == "write_file":
+                        result = write_file(parameters.get("path"), parameters.get("content"))
+                    else:
+                        result = f"Error: Tool {tool_name} not found."
+                    
+                    print(f"{GRAY}Tool result: {result}{RESET}")
+                    
+                    # Append assistant tool call and system result to history
+                    # history.append({"role": "assistant", "content": assistant_response})
+                    history.append({"role": "tool", "content": result})
+                    
+                    # Call LLM again with tool result
+                    response_data = call_llm(history, debug)
+                    assistant_response = response_data['message']['content']
+                    print(f"{GREEN}Assistant: {assistant_response}{RESET}")
+            except json.JSONDecodeError:
+                pass
+
             if is_summarize:
                 # Replace history with the summary while keeping rules
                 history = load_rules()
