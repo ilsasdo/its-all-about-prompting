@@ -12,7 +12,7 @@ def call_llm(messages, debug=False):
     payload = {
         "model": "llama3.2",
         "messages": messages,
-        "temperature": 0.4,
+        # "temperature": 0.4,
         "stream": False
     }
     
@@ -78,7 +78,8 @@ Format the output as a numbered list with clear explanations for each step."""
 2. 'write_file': Write content to a file on disk.
    To use it, respond with a correct json: {"name": "write_file", "parameters": {"path": "FILE_PATH", "content": "FILE_CONTENT"}}
 
-When you need to use a tool, provide the required parameters in the JSON object and ANSWER ONLY with a single valid JSON string"""
+When you need to use a tool, provide the required parameters in the JSON object and ANSWER ONLY with a single valid JSON string.
+If you are not calling a tool, do not use JSON format."""
 
     history.append({"role": "system", "content": TOOLS_PROMPT})
 
@@ -109,8 +110,15 @@ When you need to use a tool, provide the required parameters in the JSON object 
             
             # Detect tool call
             try:
-                data = json.loads(assistant_response)
-                if data.get("name") == "read_file" or data.get("name") == "write_file":
+                # Basic cleaning of the response to find JSON
+                clean_response = assistant_response.strip()
+                if "```json" in clean_response:
+                    clean_response = clean_response.split("```json")[1].split("```")[0].strip()
+                elif "```" in clean_response:
+                    clean_response = clean_response.split("```")[1].split("```")[0].strip()
+                
+                data = json.loads(clean_response)
+                if isinstance(data, dict) and (data.get("name") == "read_file" or data.get("name") == "write_file"):
                     tool_name = data["name"]
                     parameters = data.get("parameters", {})
                     
@@ -126,14 +134,14 @@ When you need to use a tool, provide the required parameters in the JSON object 
                     print(f"{GRAY}Tool result: {result}{RESET}")
                     
                     # Append assistant tool call and system result to history
-                    # history.append({"role": "assistant", "content": assistant_response})
-                    history.append({"role": "tool", "content": result})
+                    history.append({"role": "assistant", "content": assistant_response})
+                    history.append({"role": "user", "content": f"TOOL RESULT: {result}"})
                     
                     # Call LLM again with tool result
                     response_data = call_llm(history, debug)
                     assistant_response = response_data['message']['content']
                     print(f"{GREEN}Assistant: {assistant_response}{RESET}")
-            except json.JSONDecodeError:
+            except (json.JSONDecodeError, IndexError):
                 pass
 
             if is_summarize:
