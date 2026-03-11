@@ -1,6 +1,31 @@
 #!.venv/bin/python
 import requests
 from pathlib import Path
+import sys
+import json
+
+GRAY = "\033[90m"
+RESET = "\033[0m"
+
+def call_llm(messages, debug=False):
+    url = "http://localhost:11434/api/chat"
+    payload = {
+        "model": "llama3.2",
+        "messages": messages,
+        "stream": False
+    }
+    
+    if debug:
+        print(f"{GRAY}Request: {json.dumps(payload, indent=2)}{RESET}")
+        
+    r = requests.post(url, json=payload)
+    r.raise_for_status()
+    response_data = r.json()
+    
+    if debug:
+        print(f"{GRAY}Response: {json.dumps(response_data, indent=2)}{RESET}")
+        
+    return response_data
 
 def load_rules(rules_dir_path: str = "./rules") -> list:
     rules = []
@@ -12,15 +37,12 @@ def load_rules(rules_dir_path: str = "./rules") -> list:
                 rules.append({"role": "system", "content": rule_content})
     return rules
 
-def chat():
-    url = "http://localhost:11434/api/chat"
+def chat(debug=False):
     history = load_rules()
     
     # ANSI color codes
     BLACK = "\033[30m"
     GREEN = "\033[32m"
-    GRAY = "\033[90m"
-    RESET = "\033[0m"
     
     print("Chat with LLM (type 'exit' or 'quit' to stop, '/plan' to generate a plan)")
     
@@ -41,16 +63,7 @@ Format the output as a numbered list with clear explanations for each step."""
             history.append({"role": "user", "content": user_input})
         
         try:
-            r = requests.post(
-                url,
-                json={
-                    "model": "llama3.2",
-                    "messages": history,
-                    "stream": False
-                }
-            )
-            r.raise_for_status()
-            response_data = r.json()
+            response_data = call_llm(history, debug)
             assistant_response = response_data['message']['content']
             
             prompt_tokens = response_data.get('prompt_eval_count', 0)
@@ -68,7 +81,8 @@ Format the output as a numbered list with clear explanations for each step."""
                 history.pop()
 
 if __name__ == "__main__":
-    chat()
+    debug = "--debug" in sys.argv
+    chat(debug)
 
 # chats:
 # I want to build a simple chess engine in python. what should I do?

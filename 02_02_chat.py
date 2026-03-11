@@ -1,15 +1,37 @@
 #!.venv/bin/python
 import requests
+import sys
+import json
 
-def chat():
+GRAY = "\033[90m"
+RESET = "\033[0m"
+
+def call_llm(messages, debug=False):
     url = "http://localhost:11434/api/chat"
+    payload = {
+        "model": "llama3.2",
+        "messages": messages,
+        "stream": False
+    }
+    
+    if debug:
+        print(f"{GRAY}Request: {json.dumps(payload, indent=2)}{RESET}")
+        
+    r = requests.post(url, json=payload)
+    r.raise_for_status()
+    response_data = r.json()
+    
+    if debug:
+        print(f"{GRAY}Response: {json.dumps(response_data, indent=2)}{RESET}")
+        
+    return response_data
+
+def chat(debug=False):
     history = []
     
     # ANSI color codes
     BLACK = "\033[30m"
     GREEN = "\033[32m"
-    GRAY = "\033[90m"
-    RESET = "\033[0m"
     
     print("Chat with LLM (type 'exit' or 'quit' to stop)")
     
@@ -23,16 +45,7 @@ def chat():
         history.append({"role": "user", "content": user_input})
         
         try:
-            r = requests.post(
-                url,
-                json={
-                    "model": "llama3.2",
-                    "messages": history,
-                    "stream": False
-                }
-            )
-            r.raise_for_status()
-            response_data = r.json()
+            response_data = call_llm(history, debug)
             assistant_response = response_data['message']['content']
             
             prompt_tokens = response_data.get('prompt_eval_count', 0)
@@ -50,4 +63,5 @@ def chat():
                 history.pop()
 
 if __name__ == "__main__":
-    chat()
+    debug = "--debug" in sys.argv
+    chat(debug)
