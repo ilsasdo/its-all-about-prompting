@@ -8,6 +8,7 @@ def chat():
     # ANSI color codes
     BLACK = "\033[30m"
     GREEN = "\033[32m"
+    GRAY = "\033[90m"
     RESET = "\033[0m"
     
     print("Chat with LLM (type 'exit' or 'quit' to stop)")
@@ -34,6 +35,9 @@ def chat():
             response_data = r.json()
             assistant_response = response_data['response']
             
+            prompt_tokens = response_data.get('prompt_eval_count', 0)
+            eval_tokens = response_data.get('eval_count', 0)
+            print(f"{GRAY}[Prompt: {prompt_tokens}, Response: {eval_tokens}, Total: {prompt_tokens + eval_tokens}]{RESET}")
             print(f"{GREEN}Assistant: {assistant_response}{RESET}")
             
             # Append assistant response to history with SYSTEM: prefix
