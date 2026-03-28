@@ -2,7 +2,7 @@
 from pathlib import Path
 import sys
 import json
-from utils import call_llm, print_token_usage, RESET, GRAY
+from utils import llm_chat, print_user, print_system, print_error, print_assistant, print_debug
 
 def load_rules(rules_dir_path: str = "./rules") -> list:
     rules = []
@@ -31,10 +31,6 @@ def write_file(path: str, content: str) -> str:
 
 def chat(debug=False):
     history = load_rules()
-    
-    # ANSI color codes
-    BLACK = "\033[30m"
-    GREEN = "\033[32m"
     
     print("Chat with LLM (type 'exit' or 'quit' to stop, '/plan' to generate a plan, '/summarize' to summarize chat, '/tools' to show tool definitions)")
     
@@ -88,30 +84,29 @@ Format the output as a numbered list with clear explanations for each step."""
     ]
 
     while True:
-        user_input = input(f"{BLACK}You: ")
-        print(RESET, end="")
-        if user_input.lower() in ['exit', 'quit']:
-            break
-            
-        is_summarize = False
-        if user_input.strip().lower() == '/plan':
-            history.append({"role": "user", "content": PLAN_PROMPT})
-        elif user_input.strip().lower() == '/summarize':
-            history.append({"role": "user", "content": SUMMARIZE_PROMPT})
-            is_summarize = True
-        else:
-            # Append user input to history
-            history.append({"role": "user", "content": user_input})
-        
         try:
-            response_data = call_llm(history, tools=TOOLS, debug=debug)
+            print_user("You: ", end="")
+            user_input = input()
+            if user_input.lower() in ['exit', 'quit']:
+                break
+            
+            is_summarize = False
+            if user_input.strip().lower() == '/plan':
+                history.append({"role": "user", "content": PLAN_PROMPT})
+            elif user_input.strip().lower() == '/summarize':
+                history.append({"role": "user", "content": SUMMARIZE_PROMPT})
+                is_summarize = True
+            else:
+                # Append user input to history
+                history.append({"role": "user", "content": user_input})
+            
+            response_data = llm_chat(history, tools=TOOLS, debug=debug)
             message = response_data['message']
             assistant_response = message.get('content', '')
             
-            print_token_usage(response_data)
-            
             if assistant_response:
-                print(f"{GREEN}Assistant: {assistant_response}{RESET}")
+                print_system("Assistant: ", end="")
+                print_assistant(assistant_response)
             
             # Detect tool call
             if 'tool_calls' in message:
@@ -119,7 +114,7 @@ Format the output as a numbered list with clear explanations for each step."""
                     tool_name = tool_call['function']['name']
                     parameters = tool_call['function']['arguments']
                     
-                    print(f"{GRAY}Tool call: {tool_name}({parameters}){RESET}")
+                    print_debug(f"Tool call: {tool_name}({parameters})")
                     
                     if tool_name == "read_file":
                         result = read_file(parameters.get("path"))
@@ -128,7 +123,7 @@ Format the output as a numbered list with clear explanations for each step."""
                     else:
                         result = f"Error: Tool {tool_name} not found."
                     
-                    print(f"{GRAY}Tool result: {result}{RESET}")
+                    print_debug(f"Tool result: {result}")
                     
                     # Append assistant tool call and tool result to history
                     # For Ollama, the tool result role is "tool" and it needs the tool name or call ID
@@ -136,9 +131,10 @@ Format the output as a numbered list with clear explanations for each step."""
                     history.append({"role": "tool", "tool_name": tool_name, "content": result})
                     
                 # Call LLM again with tool result
-                response_data = call_llm(history, tools=TOOLS, debug=debug)
+                response_data = llm_chat(history, tools=TOOLS, debug=debug)
                 assistant_response = response_data['message']['content']
-                print(f"{GREEN}Assistant: {assistant_response}{RESET}")
+                print_system("Assistant: ", end="")
+                print_assistant(assistant_response)
 
             if is_summarize:
                 # Replace history with the summary while keeping rules
@@ -149,7 +145,7 @@ Format the output as a numbered list with clear explanations for each step."""
                 history.append({"role": "assistant", "content": assistant_response})
             
         except Exception as e:
-            print(f"Error: {e}")
+            print_error(f"Error: {e}")
             # Remove the last user message if it failed
             if history and history[-1]["role"] == "user":
                 history.pop()

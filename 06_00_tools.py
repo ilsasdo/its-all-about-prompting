@@ -2,7 +2,7 @@
 from pathlib import Path
 import sys
 import json
-from utils import call_llm, print_token_usage, RESET, GRAY
+from utils import llm_chat, print_user, print_system, print_error, print_assistant, print_debug
 
 def load_rules(rules_dir_path: str = "./rules") -> list:
     rules = []
@@ -32,10 +32,6 @@ def write_file(path: str, content: str) -> str:
 def chat(debug=False):
     history = load_rules()
     
-    # ANSI color codes
-    BLACK = "\033[30m"
-    GREEN = "\033[32m"
-    
     print("Chat with LLM (type 'exit' or 'quit' to stop, '/plan' to generate a plan, '/summarize' to summarize chat, '/tools' to show tool definitions)")
     
     PLAN_PROMPT = """Analyze the task and provide a detailed step-by-step plan for its execution.
@@ -60,8 +56,8 @@ If you are not calling a tool, do not use JSON format."""
     history.append({"role": "system", "content": TOOLS_PROMPT})
 
     while True:
-        user_input = input(f"{BLACK}You: ")
-        print(RESET, end="")
+        print_user("You: ", end="")
+        user_input = input()
         if user_input.lower() in ['exit', 'quit']:
             break
             
@@ -76,11 +72,11 @@ If you are not calling a tool, do not use JSON format."""
             history.append({"role": "user", "content": user_input})
         
         try:
-            response_data = call_llm(history, debug)
+            response_data = llm_chat(history, debug=debug)
             assistant_response = response_data['message']['content']
             
-            print_token_usage(response_data)
-            print(f"{GREEN}Assistant: {assistant_response}{RESET}")
+            print_system("Assistant: ", end="")
+            print_assistant(assistant_response)
             
             # Detect tool call
             try:
@@ -96,7 +92,7 @@ If you are not calling a tool, do not use JSON format."""
                     tool_name = data["name"]
                     parameters = data.get("parameters", {})
                     
-                    print(f"{GRAY}Tool call: {tool_name}({parameters}){RESET}")
+                    print_debug(f"Tool call: {tool_name}({parameters})")
                     
                     if tool_name == "read_file":
                         result = read_file(parameters.get("path"))
@@ -105,16 +101,16 @@ If you are not calling a tool, do not use JSON format."""
                     else:
                         result = f"Error: Tool {tool_name} not found."
                     
-                    print(f"{GRAY}Tool result: {result}{RESET}")
+                    print_debug(f"Tool result: {result}")
                     
                     # Append assistant tool call and system result to history
                     history.append({"role": "assistant", "content": assistant_response})
                     history.append({"role": "user", "content": f"TOOL RESULT: {result}"})
                     
-                    # Call LLM again with tool result
-                    response_data = call_llm(history, debug)
+                    response_data = llm_chat(history, debug=debug)
                     assistant_response = response_data['message']['content']
-                    print(f"{GREEN}Assistant: {assistant_response}{RESET}")
+                    print_system("Assistant: ", end="")
+                    print_assistant(assistant_response)
             except (json.JSONDecodeError, IndexError):
                 pass
 
@@ -127,7 +123,7 @@ If you are not calling a tool, do not use JSON format."""
                 history.append({"role": "assistant", "content": assistant_response})
             
         except Exception as e:
-            print(f"Error: {e}")
+            print_error(f"Error: {e}")
             # Remove the last user message if it failed
             if history and history[-1]["role"] == "user":
                 history.pop()
