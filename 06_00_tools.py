@@ -5,14 +5,18 @@ import json
 from utils import llm_chat, print_user, print_system, print_error, print_assistant, print_debug
 
 def load_rules(rules_dir_path: str = "./rules") -> list:
-    rules = []
-    rules_dir = Path(rules_dir_path)
-    if rules_dir.exists():
-        for rule_file in sorted(rules_dir.glob("*.txt")):
-            rule_content = rule_file.read_text().strip()
-            if rule_content:
-                rules.append({"role": "system", "content": rule_content})
-    return rules
+  rules_content = ["Follow these rules:"]
+  rules_dir = Path(rules_dir_path)
+  if rules_dir.exists():
+    for rule_file in sorted(rules_dir.glob("*.txt")):
+      content = rule_file.read_text().strip()
+      if content:
+        rules_content.append(content)
+
+  if len(rules_content) > 1:
+    full_rules = "\n".join(rules_content)
+    return [{"role": "system", "content": full_rules}]
+  return []
 
 def read_file(path: str) -> str:
     """Read the content of a file from disk."""

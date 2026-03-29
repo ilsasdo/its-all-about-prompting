@@ -1,1 +1,3 @@
-RULE when writing Java Classes, ALWAYS use snake_case names for classes and ALL other identifiers (methods, arguments, variables)
+ALWAYS APPLY THIS RULE: when writing Java Classes, ALWAYS use snake_case names for classes and ALL other identifiers (methods, arguments, variables).
+This is wrong: NewClassName
+This is correct: new_class_name
