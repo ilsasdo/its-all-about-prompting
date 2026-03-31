@@ -133,6 +133,7 @@ Format the output as a numbered list with clear explanations for each step."""
                     # For Ollama, the tool result role is "tool" and it needs the tool name or call ID
                     history.append(message)
                     history.append({"role": "tool", "tool_name": tool_name, "content": result})
+                    history.append({"role": "user", "content": f"Tell me what you just did."})
                     
                 # Call LLM again with tool result
                 response_data = llm_chat(history, tools=TOOLS, debug=debug)
