@@ -1,4 +1,4 @@
-#!.venv/bin/python
+#!/usr/bin/env python3
 import sys
 from utils import llm_generate, print_assistant
 

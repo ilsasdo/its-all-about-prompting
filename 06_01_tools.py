@@ -1,4 +1,4 @@
-#!.venv/bin/python
+#!/usr/bin/env python3
 from pathlib import Path
 import sys
 import json

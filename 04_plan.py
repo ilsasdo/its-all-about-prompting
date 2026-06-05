@@ -1,4 +1,4 @@
-#!.venv/bin/python
+#!/usr/bin/env python3
 from pathlib import Path
 import sys
 from utils import llm_chat, print_user, print_system, print_error, print_assistant
