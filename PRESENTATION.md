@@ -219,6 +219,14 @@ flowchart LR
 - **Context pollution**: irrelevant, outdated or wrong text steers the answer
 - **Latency and price** grow with every token, on every turn, because the whole context is resent
 
+### Prompt caching: not recomputing what was already computed
+
+Since the whole context is resent every turn, most of it is identical to the previous request. The server can **cache the already computed prefix** (the attention keys/values, the "KV cache") and only process the new tokens.
+
+- It works only on a **stable prefix**: put rules, tool descriptions and history first, and what changes last. Editing something at the start invalidates everything after it.
+- Providers bill cached input tokens at a discount and respond faster. Locally, Ollama reuses the KV cache between requests with the same prefix, which is why `prompt_eval_count` can drop on follow-up turns.
+- Cost still grows with context size: the cache saves compute, not the window itself.
+
 **Practical rule:** put in the context *what is needed*, not *what is available*. This is why we summarize, retrieve (RAG) and load skills on demand.
 
 ## 6. Prompt injection
