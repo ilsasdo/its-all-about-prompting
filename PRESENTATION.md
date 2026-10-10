@@ -44,6 +44,7 @@ reads and writes files, runs commands...
 # Let's build one
 
 Each step adds **one idea** on top of the previous one.
+From step 3 on, every step is the same trick: **a prompt + a side effect**.
 
 ```mermaid
 flowchart LR
@@ -148,6 +149,9 @@ Hi!<|eot_id|>
 - `rules/02_rule.txt`: answer in HTML
 - `rules/02_rule_2.txt`: snake_case Java
 
+**Prompt:** text from a file
+**Effect:** stays in the context on **every** turn
+
 `03_rules.mjs`
 
 <!-- Ask a question, delete the rule file, ask again: same model, different behaviour, because the prompt changed. -->
@@ -158,8 +162,10 @@ Hi!<|eot_id|>
 
 **A `/plan` command is a prompt template.**
 
-- It expands to a longer prompt
 - Commands, skills, "plan mode": no magic, just **text injected into the context**
+
+**Prompt:** a template that expands to a longer prompt
+**Effect:** changes the **shape of the answer**
 
 `04_plan.mjs`
 
@@ -169,9 +175,11 @@ Hi!<|eot_id|>
 
 **The history grows forever: ask the LLM to compress it.**
 
-- Replace the history with the summary
 - The context shrinks, but **details are lost**
 - A trade-off, not a free lunch
+
+**Prompt:** "summarize this conversation"
+**Effect:** the answer **replaces the history**, so it rewrites the context itself
 
 `05_summarize.mjs`
 
@@ -183,6 +191,8 @@ Hi!<|eot_id|>
 
 **The LLM never executes anything.**
 It receives the *description* of the tools and answers with the *command it wants to invoke*. Our code runs it.
+
+**Prompt:** tool descriptions · **Effect:** our code **runs something in the real world**
 
 ```mermaid
 sequenceDiagram
@@ -225,13 +235,29 @@ flowchart LR
     H --> B
 ```
 
-<!-- In 06_01 the tool is called once, then the model answers. Remove that limit: loop while the model asks for tools. That is an agent. -->
+<!-- 06_01 loops while the model keeps asking for tools: ask it to read a file and write a summary to another file to see two consecutive tool calls. -->
 
 ---
 
 <!-- _class: lead -->
 
 # Recap
+
+---
+
+# Prompt + side effect
+
+Same mechanism, three kinds of effect:
+
+| Step      | Prompt                       | Side effect                               |
+|-----------|------------------------------|-------------------------------------------|
+| Rules     | text from a file             | stays in the context on every turn        |
+| Plan      | a template                   | changes the shape of the answer           |
+| Summarize | "compress the chat"          | **replaces the history** (rewrites context) |
+| Tools     | tool descriptions            | our code **acts in the real world**       |
+
+Influence the answer → rewrite the context → act outside.
+**An agent repeats this in a loop.**
 
 ---
 

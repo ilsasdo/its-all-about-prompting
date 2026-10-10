@@ -50,16 +50,21 @@ while (true) {
       isSummarize = true;
     } else history.push({ role: "user", content: userInput });
 
-    let data = await llmChat(history, TOOLS, debug);
-    const message = data.message;
-    let reply = message.content || "";
+    // The agent loop: keep calling the LLM while it asks for tools
+    const MAX_STEPS = 10;
+    let reply = "";
+    for (let step = 0; step < MAX_STEPS; step++) {
+      const data = await llmChat(history, TOOLS, debug);
+      const message = data.message;
+      reply = message.content || "";
 
-    if (reply) {
-      printSystem("Assistant: ", "");
-      printAssistant(reply);
-    }
+      if (reply) {
+        printSystem("Assistant: ", "");
+        printAssistant(reply);
+      }
 
-    if (message.tool_calls?.length) {
+      if (!message.tool_calls?.length) break;
+
       history.push(message);
       for (const call of message.tool_calls) {
         const name = call.function.name;
@@ -69,11 +74,6 @@ while (true) {
         printDebug(`Tool result: ${result}`);
         history.push({ role: "tool", tool_name: name, content: result });
       }
-      history.push({ role: "user", content: "Tell me what you just did." });
-      data = await llmChat(history, TOOLS, debug);
-      reply = data.message.content;
-      printSystem("Assistant: ", "");
-      printAssistant(reply);
     }
 
     if (isSummarize) {
