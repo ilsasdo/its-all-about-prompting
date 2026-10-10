@@ -1,0 +1,19 @@
+{
+  "name": "its-all-about-prompting",
+  "version": "1.0.0",
+  "description": "Talk demo: how AI agents work (Node.js, Ollama + llama3.2)",
+  "type": "module",
+  "engines": { "node": ">=18" },
+  "scripts": {
+    "01_00": "node 01_00_generate.mjs",
+    "01_01": "node 01_01_generate.mjs",
+    "02_00": "node 02_00_chat.mjs",
+    "02_01": "node 02_01_chat.mjs",
+    "02_02": "node 02_02_chat.mjs",
+    "03": "node 03_rules.mjs",
+    "04": "node 04_plan.mjs",
+    "05": "node 05_summarize.mjs",
+    "06_01": "node 06_01_tools.mjs",
+    "06_02": "node 06_02_tools.mjs"
+  }
+}
