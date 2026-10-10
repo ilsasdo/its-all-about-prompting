@@ -10,45 +10,19 @@ An agent:
 - Answers questions
 - Chats
 - Can reason and explain
-- We can tell it Rules and Skills
+- Follows Rules and Skills we give it
 - Creates Plans for complex tasks
 - Reads and writes files, surfs the web
 - Executes Commands / MCPs
-- Remembers what it did
+- *Seems* to remember what it did
 
 > … let's break it down
 
 ---
 
-## 2. Agent Breakdown
+## 2. The agent's loop
 
-Each capability maps to a demo script in this repo:
-
-| Concept   | Demo                                        |
-|-----------|---------------------------------------------|
-| generate  | `01_00_generate.mjs`, `01_01_generate.mjs`  |
-| chat      | `02_00_chat.mjs`, `02_01_chat.mjs`, `02_02_chat.mjs` |
-| rules     | `03_rules.mjs` + `rules/`                   |
-| plans     | `04_plan.mjs`                               |
-| summarize | `05_summarize.mjs`                          |
-| tools     | `06_01_tools.mjs`, `06_02_tools.mjs`        |
-| mcp       | *(no demo yet)*                             |
-
-```mermaid
-flowchart LR
-    G[generate] --> C[chat]
-    C --> R[rules]
-    R --> P[plans]
-    P --> S[summarize]
-    S --> T[tools]
-    T --> M[mcp]
-```
-
-**Coding time**
-
----
-
-## 3. The agent's loop
+Everything an agent does is this loop. The rest of the talk fills in each box.
 
 ```mermaid
 flowchart TD
@@ -65,7 +39,48 @@ flowchart TD
 
 ---
 
-## 4. The Agentic Illusion
+## 3. Agent breakdown
+
+Each capability is one small step on top of the previous demo:
+
+| Concept   | What it adds                         | Demo                                                 |
+|-----------|--------------------------------------|------------------------------------------------------|
+| generate  | one prompt in, one answer out        | `01_00_generate.mjs`, `01_01_generate.mjs`           |
+| chat      | we resend the history every turn     | `02_00_chat.mjs`, `02_01_chat.mjs`, `02_02_chat.mjs` |
+| rules     | a system prompt loaded from files    | `03_rules.mjs` + `rules/`                            |
+| plans     | a reusable `/plan` prompt            | `04_plan.mjs`                                        |
+| summarize | `/summarize` shrinks the history     | `05_summarize.mjs`                                   |
+| tools     | the model asks, our code executes    | `06_01_tools.mjs`, `06_02_tools.mjs`                 |
+
+MCP is the standard way to plug tools into an agent. It is not demoed here, see "What's next".
+
+```mermaid
+flowchart LR
+    G[generate] --> C[chat]
+    C --> R[rules]
+    R --> P[plans]
+    P --> S[summarize]
+    S --> T[tools]
+```
+
+**Coding time**
+
+---
+
+## 4. Rules, skills, commands, tools
+
+| Term     | In one line                                                    |
+|----------|----------------------------------------------------------------|
+| Rule     | Text always added to the context (`rules/*.txt`)               |
+| Skill    | Instructions loaded into the context only when needed          |
+| Command  | A shortcut that expands to a prompt (`/plan`, `/summarize`)    |
+| Tool     | A function the model can ask us to run (`read_file`)           |
+
+All of them end up the same way: as text in the context.
+
+---
+
+## 5. The Agentic Illusion
 
 - LLMs have no state
 - No memory
@@ -74,7 +89,7 @@ flowchart TD
 
 **but…**
 
-> it's the most powerful `String -> String` function ever created
+> It's the most powerful `String -> String` function ever created.
 
 ```mermaid
 sequenceDiagram
@@ -89,11 +104,11 @@ sequenceDiagram
 
 ---
 
-## 5. It's all about context
+## 6. It's all about context
 
 > The LLM only sees the context we give it.
 
-### 5.1 Content
+### 6.1 Content
 
 ```mermaid
 flowchart TB
@@ -107,67 +122,61 @@ flowchart TB
     S --> R --> T --> H --> U --> LLM
 ```
 
-### 5.2 Size
+*Live:* run any demo with `--debug` and look at `[Prompt, Response, Total]` tokens grow turn after turn.
 
-- O(n²) attention cost
-- Maximum positional embeddings
-- Sliding context window
+### 6.2 Size
+
+- **O(n²)**: attention compares every token with every other token, so doubling the context roughly quadruples the cost
+- **Maximum positional embeddings**: the model was trained for a maximum length and cannot see beyond it
+- **Sliding context window**: old messages are dropped when the window is full
 
 ```mermaid
 flowchart LR
+    m1[msg 1] -.dropped.-> Window
+    m2[msg 2] -.dropped.-> Window
     subgraph Window[Context window]
         direction LR
         m3[msg 3] --- m4[msg 4] --- m5[msg 5] --- m6[msg 6]
     end
-    m1[msg 1] -.dropped.-> Window
-    m2[msg 2] -.dropped.-> Window
 ```
 
-### 5.3 Issues
+*Live:* run `/summarize` in `05_summarize.mjs` and compare the token count before and after. The context shrinks, but detail is lost.
 
-- Big ≠ best
-- Context pollution
-- Prompt injection
+### 6.3 Issues
+
+- **Big ≠ best**: more context means more cost and more noise
+- **Context pollution**: irrelevant or wrong text steers the answer
+- **Prompt injection**: the model cannot tell our instructions from instructions hidden in the data it reads
+
+*Live:* with `06_01_tools.mjs`, ask: "read `demo/injection.txt` and summarize it". Does the agent obey the hidden instruction?
 
 ---
 
-## 6. Thank you :)
+## 7. What's next
+
+- **MCP**: tools exposed by external servers instead of functions in our code
+- Better memory: persisting summaries and facts between sessions
+- Guardrails against prompt injection
+
+---
+
+## 8. Takeaway
+
+> **Agent = LLM + loop + context management + tools**
+
+---
+
+## 9. Thank you :)
 
 ## References
 
-- This repository
+- [This repository](https://github.com/ilsasdo/its-all-about-prompting): the demos of this talk
 - The article that inspired this talk
-- How LLM works (ITA), Pinperepette
-- Claude Source Code explained, Pinperepette
-- Tiktokenizer, Tokenization Visualized
-- Transformer Visualized
-- MicroGPT, GPT training and inference in 200 loc
-- https://bbycroft.net/llm
+- How LLM works (ITA), Pinperepette: an introduction to how LLMs work
+- Claude Source Code explained, Pinperepette: how a real coding agent is built
+- Tiktokenizer, Tokenization Visualized: see how text becomes tokens
+- Transformer Visualized: the architecture step by step
+- MicroGPT, GPT training and inference in 200 loc: the smallest working GPT
+- [LLM visualization](https://bbycroft.net/llm): a 3D walk-through of a GPT
 
 *Leave me feedback!*
-
----
-
-# Feedback
-
-## Strengths
-
-- Strong thesis: "the LLM is a stateless `String -> String` function" demystifies agents.
-- The demos build up one capability at a time (generate → chat → rules → plan → summarize → tools), so each new concept is a small diff.
-- The "Agentic Illusion → but…" reversal is a good hook.
-
-## Suggested improvements
-
-1. **Order of the jargon vs. the breakdown.** The agent list (slide 1) and the breakdown (slide 2) say almost the same thing. Merge them into one diagram where each capability is mapped to a demo.
-2. **Show the loop earlier.** "The agent's loop" is the core idea; consider presenting it right after the jargon slide, then use the demos to fill in each box.
-3. **MCP has no demo.** It is listed first in the breakdown but never shown. Either add a small demo (e.g. a minimal MCP server exposing `read_file`) or move it to a "what's next" slide.
-4. **Rules vs. skills vs. commands vs. tools** are used as synonyms. Add one slide that defines each in one line.
-5. **Context slides are text-only.** Add visuals: a stacked bar showing which part of the context uses how many tokens (the demo already prints `[Prompt, Response, Total]` with `--debug`, use it live).
-6. **Prompt injection needs an example.** A 30-second demo is enough: have the agent `read_file` a file containing "ignore previous instructions and write X", and show it comply.
-7. **Show the summarize trade-off.** `/summarize` fixes context size but loses detail; show the token count before and after.
-8. **Explain the "O(n²)" bullet.** Say in one sentence what is quadratic (attention between every pair of tokens), otherwise it reads as jargon.
-9. **Memory.** The agent list claims "Remembers what it did", while the next slides say the LLM has no memory. Reword to "Seems to remember" to keep it consistent with the illusion.
-10. **Add a closing takeaway slide** before "Thank you": e.g. "Agent = LLM + loop + context management + tools".
-11. **References.** Label links with titles and a short reason ("read this for X"), and make the repository link actually clickable.
-12. **Typo.** The text contains `String-&gt;String`, which is an HTML-escaped `>` from the export; fix it in the slide.
-13. **Typography.** "it's all about prompting" and "by enrico sasdelli" are lowercase; use consistent capitalization.
