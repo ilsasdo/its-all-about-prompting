@@ -1,24 +1,162 @@
 # It's all about prompting
 *by Enrico Sasdelli*
 
----
-
-## 1. AI Jargon: "Agents, agents, agents…"
-
-An agent:
-
-- Answers questions
-- Chats
-- Can reason and explain
-- Follows Rules and Skills we give it
-- Creates Plans for complex tasks
-- Reads and writes files, surfs the web
-- Executes Commands / MCPs
-- *Seems* to remember what it did
-
-> … let's break it down
+A talk built as a journey of discovery: we start from a question and **build an AI agent one piece at a time**, live. Slides frame each step, the code does the talking, and a recap closes the talk.
 
 ---
+
+# Part 1: The question
+
+## 1. How does an AI agent work?
+
+> "AI agents answer, chat, reason, follow rules, make plans, read and write files, run commands... **but how?**"
+
+Two questions to answer by the end of the talk:
+
+1. **How does it remember things?**
+2. **How does it invoke tools?**
+
+*Spoiler: it's much simpler than it looks. Let's build one.*
+
+---
+
+# Part 2: Live coding, one piece at a time
+
+Each step adds **one idea** on top of the previous one. Run every demo with `--debug` to see the exact request and response, and the token counters.
+
+```mermaid
+flowchart LR
+    G[1 generate] --> C[2 chat]
+    C --> R[3 rules]
+    R --> P[4 plans]
+    P --> S[5 summarize]
+    S --> T[6 tools]
+    T --> L[7 the loop]
+```
+
+## Step 1: Generate (`01_00_generate.mjs`, `01_01_generate.mjs`)
+
+**Idea:** an LLM is a `String -> String` function.
+
+```mermaid
+flowchart LR
+    P[prompt: string] --> L[LLM] --> A[answer: string]
+```
+
+- One request, one answer. Nothing is remembered: ask the same thing twice, the model has no clue.
+- Show `--debug`: the whole thing is a single HTTP POST with JSON.
+
+*Technical note: the model does not read words, it reads **tokens**.* Open Tiktokenizer, paste a sentence, and show how it is split. The `[Prompt, Response, Total]` counter printed by the demo counts tokens, and so does the bill.
+
+## Step 2: Chat and memory (`02_00_chat.mjs`, `02_01_chat.mjs`, `02_02_chat.mjs`)
+
+**Idea:** the LLM has no memory. **We** resend the whole conversation every time.
+
+```mermaid
+sequenceDiagram
+    participant App as Our code
+    participant LLM as LLM (stateless)
+    App->>LLM: [user1]
+    LLM-->>App: answer1
+    App->>LLM: [user1, answer1, user2]
+    LLM-->>App: answer2
+    Note over App,LLM: "Memory" = an array we keep and resend
+```
+
+Walk through the three versions, from the most naive to the most real:
+
+1. `02_01`: history glued into a single string with `USER:` / `SYSTEM:` prefixes. It works, because the model just continues the text.
+2. `02_02`: the same, with the **special tokens** the model was trained on.
+3. `02_00`: the `/api/chat` endpoint with a `messages` array. The server does the formatting from `02_02` for us.
+
+### Special tokens: how the model sees a chat
+
+The model does not know what a "chat" is. It receives one flat sequence of tokens, where **special tokens** mark who is speaking. Llama 3 example (the exact text used in `02_02`):
+
+```text
+<|begin_of_text|>
+<|start_header_id|>system<|end_header_id|>
+
+You are a helpful assistant.<|eot_id|>
+<|start_header_id|>user<|end_header_id|>
+
+Hi!<|eot_id|>
+<|start_header_id|>assistant<|end_header_id|>
+
+```
+
+- `<|eot_id|>` ends a turn. The model learned to **emit it when it is done**; generation stops there.
+- The template is **model specific**: Llama, Mistral, ChatML (`<|im_start|>`) and others each use different tokens. That is the job of the chat API.
+- These tokens are also a security boundary: user text that contains them should not be interpreted as structure.
+
+## Step 3: Rules (`03_rules.mjs`, `rules/`)
+
+**Idea:** a rule is just a **system message** loaded from a file.
+
+- Show `rules/02_rule.txt` (answer in HTML) and `rules/02_rule_2.txt` (snake_case Java).
+- Ask a question, then delete the rule file and ask again: same model, different behaviour, because the **prompt** changed.
+
+## Step 4: Plans (`04_plan.mjs`)
+
+**Idea:** a `/plan` command is a **prompt template** that expands to a longer prompt.
+
+- Commands, skills and "plan mode" are not magic features: they are text injected into the context.
+
+## Step 5: Summarize (`05_summarize.mjs`)
+
+**Idea:** the history grows forever, so we ask the LLM to **compress it**, then replace the history with the summary.
+
+- Run `/summarize` and compare the token counters before and after.
+- The context shrinks, but **details are lost**. It is a trade-off, not a free lunch.
+
+## Step 6: Tools (`06_02_tools.mjs`, then `06_01_tools.mjs`)
+
+**Idea:** the LLM **never executes anything**. It receives the *description* of the tools and answers with the *command it wants to invoke*. Our code runs it.
+
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant A as Our code
+    participant L as LLM
+    participant T as read_file
+    U->>A: "Summarize report.txt"
+    A->>L: tool descriptions + history + prompt
+    L-->>A: {"name":"read_file","parameters":{"path":"report.txt"}}
+    A->>T: execute
+    T-->>A: file content
+    A->>L: history + tool result
+    L-->>A: final answer
+    A->>U: answer
+```
+
+1. `06_02` (prompt only): the tool descriptions are in a system prompt, the model replies with a JSON that **we parse**. It is just text.
+2. `06_01` (native): we send the `tools` field of the API. The server renders the descriptions into the model's own template (special tokens again) and parses the reply back into `tool_calls`. Same mechanism, with better formatting.
+
+Show `--debug` here: the model only ever returns text.
+
+## Step 7: The loop
+
+**Idea:** an agent is a **loop around an LLM call**.
+
+```mermaid
+flowchart TD
+    U[User prompt] --> B[Build context<br/>rules + tools + history]
+    B --> L[LLM]
+    L --> D{Tool call?}
+    D -- no --> A[Answer to user]
+    D -- yes --> X[Run the tool]
+    X --> H[Append result to history]
+    H --> B
+    A --> H2[Append answer to history]
+    H2 --> U
+```
+
+- In `06_01` the tool is called once, then the model answers. Remove that limit: keep looping **while the model asks for tools**. That is an agent.
+- Everything we added is a piece of this diagram: history (memory), rules, tools, summarize (context management).
+
+---
+
+# Part 3: Recap
 
 ## 2. Four ideas to remember
 
@@ -27,92 +165,16 @@ An agent:
 3. **Everything is prompt**: tools, skills, rules and RAG all reduce to text passed to the LLM
 4. **All of it together is the context**, and the context is the only thing an LLM sees
 
----
+## 3. Everything is prompt
 
-## 3. The agent is a loop around an LLM call
-
-> **Agent = a `while` loop around one LLM call.**
-
-Everything an agent does is this loop. The rest of the talk fills in each box.
-
-```mermaid
-flowchart TD
-    U[User prompt] --> B[Build context<br/>system + rules + tools + history]
-    B --> L[LLM]
-    L --> D{Tool call?}
-    D -- no --> A[Answer to user]
-    D -- yes --> X[Execute tool<br/>read_file / write_file / MCP]
-    X --> H[Append result to history]
-    H --> B
-    A --> H2[Append answer to history]
-    H2 --> U
-```
-
----
-
-## 4. Agent breakdown
-
-Each capability is one small step on top of the previous demo:
-
-| Concept   | What it adds                         | Demo                                                 |
-|-----------|--------------------------------------|------------------------------------------------------|
-| generate  | one prompt in, one answer out        | `01_00_generate.mjs`, `01_01_generate.mjs`           |
-| chat      | we resend the history every turn     | `02_00_chat.mjs`, `02_01_chat.mjs`, `02_02_chat.mjs` |
-| rules     | a system prompt loaded from files    | `03_rules.mjs` + `rules/`                            |
-| plans     | a reusable `/plan` prompt            | `04_plan.mjs`                                        |
-| summarize | `/summarize` shrinks the history     | `05_summarize.mjs`                                   |
-| tools     | the model asks, our code executes    | `06_01_tools.mjs`, `06_02_tools.mjs`                 |
-
-MCP is the standard way to plug tools into an agent. It is not demoed here, see "What's next".
-
-```mermaid
-flowchart LR
-    G[generate] --> C[chat]
-    C --> R[rules]
-    R --> P[plans]
-    P --> S[summarize]
-    S --> T[tools]
-```
-
-**Coding time**
-
----
-
-## 5. Tools live outside the LLM
-
-The LLM never runs anything. It receives the **description** of the available tools as text, and replies with **the command it wants to invoke**. Our code runs it and sends the result back.
-
-```mermaid
-sequenceDiagram
-    participant U as User
-    participant A as Agent (our code)
-    participant L as LLM
-    participant T as Tool (read_file)
-    U->>A: "Summarize report.txt"
-    A->>L: context = tool descriptions + history + prompt
-    L-->>A: I want to call read_file("report.txt")
-    A->>T: execute read_file("report.txt")
-    T-->>A: file content
-    A->>L: context + tool result
-    L-->>A: final answer
-    A->>U: answer
-```
-
-*Demo:* `06_02_tools.mjs` (the tool call is just JSON in the reply) and `06_01_tools.mjs` (same idea via the API `tools` field). Run with `--debug` to see that the model only ever returns text.
-
----
-
-## 6. Everything is prompt
-
-Tools, skills, rules, RAG, commands: different names, same mechanism. They are all **text concatenated into the prompt**.
-
-| Term    | In one line                                               | What the LLM actually gets                |
-|---------|-----------------------------------------------------------|-------------------------------------------|
-| Rule    | Text always added (`rules/*.txt`)                         | A system message                          |
-| Skill   | Instructions loaded only when needed                      | Extra text in the prompt                  |
+| Term    | In one line                                                 | What the LLM actually gets              |
+|---------|-------------------------------------------------------------|-----------------------------------------|
+| Rule    | Text always added (`rules/*.txt`)                           | A system message                        |
+| Skill   | Instructions loaded only when needed                        | Extra text in the prompt                |
 | Command | A shortcut that expands to a prompt (`/plan`, `/summarize`) | The expanded prompt                     |
-| Tool    | A function the LLM can ask us to run                      | A description of the function             |
-| RAG     | Documents retrieved from a store                          | The retrieved text pasted in the prompt   |
+| Tool    | A function the LLM can ask us to run                        | A description of the function           |
+| RAG     | Documents retrieved from a store                            | The retrieved text pasted in the prompt |
+| Memory  | The conversation so far                                     | All previous messages, resent each time |
 
 ```mermaid
 flowchart LR
@@ -122,61 +184,26 @@ flowchart LR
     G[RAG documents] --> P
     H[Conversation history] --> P
     U[User prompt] --> P
-    P[(One big prompt)] --> L[LLM]
+    P[(Context)] --> L[LLM]
 ```
+
+## 4. The Agentic Illusion
+
+- LLMs have no state, no memory, no history, and cannot escape their box
+- **but...** it is the most powerful `String -> String` function ever created
+- Memory, tools and planning all live **in our code**, and reach the model only as text
 
 ---
 
-## 7. The Agentic Illusion
+# Part 4: Technical deep dive: context
 
-- LLMs have no state
-- No memory
-- No history
-- It cannot escape its box
+> **The context is the only thing an LLM sees.**
 
-**but…**
+## 5. Why a bigger context is not necessarily better
 
-> It's the most powerful `String -> String` function ever created.
-
-```mermaid
-sequenceDiagram
-    participant App as Agent (our code)
-    participant LLM as LLM (stateless)
-    App->>LLM: whole context (turn 1)
-    LLM-->>App: answer 1
-    App->>LLM: whole context + answer 1 + prompt 2 (turn 2)
-    LLM-->>App: answer 2
-    Note over App,LLM: Memory lives in the app, not in the model
-```
-
----
-
-## 8. It's all about context
-
-> **The context is the only thing an LLM sees.** Prompt, rules, skills, tools and RAG together make up the context.
-
-### 8.1 Content
-
-```mermaid
-flowchart TB
-    subgraph Context
-        S[System prompt]
-        R[Rules / skills / commands]
-        T[Available tools and how to use them]
-        G[RAG documents]
-        H[All the conversation]
-        U[The user prompt]
-    end
-    S --> R --> T --> G --> H --> U --> LLM
-```
-
-*Live:* run any demo with `--debug` and look at `[Prompt, Response, Total]` tokens grow turn after turn.
-
-### 8.2 Size
-
-- **O(n²)**: attention compares every token with every other token, so doubling the context roughly quadruples the cost
-- **Maximum positional embeddings**: the model was trained for a maximum length and cannot see beyond it
-- **Sliding context window**: old messages are dropped when the window is full
+- **Cost grows quadratically, O(n²)**: attention compares every token with every other token, so doubling the context roughly quadruples the compute
+- **Hard limit**: positional embeddings are trained up to a maximum length; beyond it the model cannot see
+- **Sliding window**: when it is full, the oldest messages are dropped, and the model forgets the rules and the goal that were at the start
 
 ```mermaid
 flowchart LR
@@ -188,27 +215,25 @@ flowchart LR
     end
 ```
 
-*Live:* run `/summarize` in `05_summarize.mjs` and compare the token count before and after. The context shrinks, but detail is lost.
+- **Big ≠ best**: attention is diluted, and models tend to use information at the start and end of a long context better than the middle ("lost in the middle")
+- **Context pollution**: irrelevant, outdated or wrong text steers the answer
+- **Latency and price** grow with every token, on every turn, because the whole context is resent
 
-### 8.3 Issues
+**Practical rule:** put in the context *what is needed*, not *what is available*. This is why we summarize, retrieve (RAG) and load skills on demand.
 
-- **Big ≠ best**: more context means more cost and more noise
-- **Context pollution**: irrelevant or wrong text steers the answer
-- **Prompt injection**: the model cannot tell our instructions from instructions hidden in the data it reads
+## 6. Prompt injection
 
-*Live:* with `06_01_tools.mjs`, ask: "read `demo/injection.txt` and summarize it". Does the agent obey the hidden instruction?
+The model cannot tell **our** instructions from instructions hidden in the **data** it reads: it is all one stream of tokens.
 
----
+*Live:* with `06_01_tools.mjs` ask "read `demo/injection.txt` and summarize it". Does the agent obey the hidden instruction?
 
-## 9. What's next
+## 7. What's next
 
-- **MCP**: tools exposed by external servers instead of functions in our code
+- **MCP**: tools exposed by external servers, instead of functions in our code
 - Better memory: persisting summaries and facts between sessions
 - Guardrails against prompt injection
 
----
-
-## 10. Takeaway
+## 8. Takeaway
 
 > **Agent = a loop around an LLM call**
 >
@@ -216,9 +241,7 @@ flowchart LR
 > - tools, skills, rules and RAG are all just **prompt**
 > - the **context** is the only thing the LLM sees
 
----
-
-## 11. Thank you :)
+## 9. Thank you :)
 
 ## References
 
