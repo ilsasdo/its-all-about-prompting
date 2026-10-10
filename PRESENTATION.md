@@ -20,7 +20,18 @@ An agent:
 
 ---
 
-## 2. The agent's loop
+## 2. Four ideas to remember
+
+1. **An AI agent is a loop around an LLM call**
+2. **Tools run outside the LLM**: it only receives their description and answers with the command it wants to invoke
+3. **Everything is prompt**: tools, skills, rules and RAG all reduce to text passed to the LLM
+4. **All of it together is the context**, and the context is the only thing an LLM sees
+
+---
+
+## 3. The agent is a loop around an LLM call
+
+> **Agent = a `while` loop around one LLM call.**
 
 Everything an agent does is this loop. The rest of the talk fills in each box.
 
@@ -39,7 +50,7 @@ flowchart TD
 
 ---
 
-## 3. Agent breakdown
+## 4. Agent breakdown
 
 Each capability is one small step on top of the previous demo:
 
@@ -67,20 +78,56 @@ flowchart LR
 
 ---
 
-## 4. Rules, skills, commands, tools
+## 5. Tools live outside the LLM
 
-| Term     | In one line                                                    |
-|----------|----------------------------------------------------------------|
-| Rule     | Text always added to the context (`rules/*.txt`)               |
-| Skill    | Instructions loaded into the context only when needed          |
-| Command  | A shortcut that expands to a prompt (`/plan`, `/summarize`)    |
-| Tool     | A function the model can ask us to run (`read_file`)           |
+The LLM never runs anything. It receives the **description** of the available tools as text, and replies with **the command it wants to invoke**. Our code runs it and sends the result back.
 
-All of them end up the same way: as text in the context.
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant A as Agent (our code)
+    participant L as LLM
+    participant T as Tool (read_file)
+    U->>A: "Summarize report.txt"
+    A->>L: context = tool descriptions + history + prompt
+    L-->>A: I want to call read_file("report.txt")
+    A->>T: execute read_file("report.txt")
+    T-->>A: file content
+    A->>L: context + tool result
+    L-->>A: final answer
+    A->>U: answer
+```
+
+*Demo:* `06_02_tools.mjs` (the tool call is just JSON in the reply) and `06_01_tools.mjs` (same idea via the API `tools` field). Run with `--debug` to see that the model only ever returns text.
 
 ---
 
-## 5. The Agentic Illusion
+## 6. Everything is prompt
+
+Tools, skills, rules, RAG, commands: different names, same mechanism. They are all **text concatenated into the prompt**.
+
+| Term    | In one line                                               | What the LLM actually gets                |
+|---------|-----------------------------------------------------------|-------------------------------------------|
+| Rule    | Text always added (`rules/*.txt`)                         | A system message                          |
+| Skill   | Instructions loaded only when needed                      | Extra text in the prompt                  |
+| Command | A shortcut that expands to a prompt (`/plan`, `/summarize`) | The expanded prompt                     |
+| Tool    | A function the LLM can ask us to run                      | A description of the function             |
+| RAG     | Documents retrieved from a store                          | The retrieved text pasted in the prompt   |
+
+```mermaid
+flowchart LR
+    R[Rules] --> P
+    S[Skills] --> P
+    T[Tool descriptions] --> P
+    G[RAG documents] --> P
+    H[Conversation history] --> P
+    U[User prompt] --> P
+    P[(One big prompt)] --> L[LLM]
+```
+
+---
+
+## 7. The Agentic Illusion
 
 - LLMs have no state
 - No memory
@@ -104,11 +151,11 @@ sequenceDiagram
 
 ---
 
-## 6. It's all about context
+## 8. It's all about context
 
-> The LLM only sees the context we give it.
+> **The context is the only thing an LLM sees.** Prompt, rules, skills, tools and RAG together make up the context.
 
-### 6.1 Content
+### 8.1 Content
 
 ```mermaid
 flowchart TB
@@ -116,15 +163,16 @@ flowchart TB
         S[System prompt]
         R[Rules / skills / commands]
         T[Available tools and how to use them]
+        G[RAG documents]
         H[All the conversation]
         U[The user prompt]
     end
-    S --> R --> T --> H --> U --> LLM
+    S --> R --> T --> G --> H --> U --> LLM
 ```
 
 *Live:* run any demo with `--debug` and look at `[Prompt, Response, Total]` tokens grow turn after turn.
 
-### 6.2 Size
+### 8.2 Size
 
 - **O(n²)**: attention compares every token with every other token, so doubling the context roughly quadruples the cost
 - **Maximum positional embeddings**: the model was trained for a maximum length and cannot see beyond it
@@ -142,7 +190,7 @@ flowchart LR
 
 *Live:* run `/summarize` in `05_summarize.mjs` and compare the token count before and after. The context shrinks, but detail is lost.
 
-### 6.3 Issues
+### 8.3 Issues
 
 - **Big ≠ best**: more context means more cost and more noise
 - **Context pollution**: irrelevant or wrong text steers the answer
@@ -152,7 +200,7 @@ flowchart LR
 
 ---
 
-## 7. What's next
+## 9. What's next
 
 - **MCP**: tools exposed by external servers instead of functions in our code
 - Better memory: persisting summaries and facts between sessions
@@ -160,13 +208,17 @@ flowchart LR
 
 ---
 
-## 8. Takeaway
+## 10. Takeaway
 
-> **Agent = LLM + loop + context management + tools**
+> **Agent = a loop around an LLM call**
+>
+> - tools run **outside** the LLM: it only describes what it wants to call
+> - tools, skills, rules and RAG are all just **prompt**
+> - the **context** is the only thing the LLM sees
 
 ---
 
-## 9. Thank you :)
+## 11. Thank you :)
 
 ## References
 
