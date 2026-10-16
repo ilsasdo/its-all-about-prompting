@@ -38,7 +38,7 @@ def print_debug(text, end="\n"):
 def print_assistant(text, end="\n"):
     print_yellow(text, end=end)
 
-def llm_post_request(url, payload, debug=False):
+def llm_post_request(url, payload, debug=False, verbose=False):
     if debug:
         print_debug(f"Request: {json.dumps(payload, indent=2)}")
         
@@ -47,22 +47,31 @@ def llm_post_request(url, payload, debug=False):
     response_data = r.json()
     
     if debug:
-        print_debug(f"Response: {json.dumps(response_data, indent=2)}")
+        if verbose:
+            response_debug = json.dumps(response_data, indent=2)
+        else:
+            response_value = response_data.get('response')
+            if response_value is None:
+                message = response_data.get('message')
+                if isinstance(message, dict):
+                    response_value = message.get('content')
+            response_debug = str(response_value)
+        print_debug(f"Response: {response_debug}")
         
     _print_token_usage(response_data)
     return response_data
 
-def llm_generate(prompt, debug=False):
+def llm_generate(prompt, debug=False, verbose=False):
     url = "http://localhost:11434/api/generate"
     payload = {
         "model": "llama3.2",
         "prompt": prompt,
         "stream": False
     }
-    response_data = llm_post_request(url, payload, debug)
+    response_data = llm_post_request(url, payload, debug, verbose)
     return response_data['response']
 
-def llm_chat(messages, tools=None, debug=False):
+def llm_chat(messages, tools=None, debug=False, verbose=False):
     url = "http://localhost:11434/api/chat"
     payload = {
         "model": "llama3.2",
@@ -71,7 +80,7 @@ def llm_chat(messages, tools=None, debug=False):
     }
     if tools:
         payload["tools"] = tools
-    return llm_post_request(url, payload, debug)
+    return llm_post_request(url, payload, debug, verbose)
 
 
 def _print_token_usage(response_data):
