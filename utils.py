@@ -53,7 +53,7 @@ def llm_post_request(url, payload, debug=False):
     return response_data
 
 def llm_generate(prompt, debug=False):
-    url = "http://localhost:11435/api/generate"
+    url = "http://localhost:11434/api/generate"
     payload = {
         "model": "llama3.2",
         "prompt": prompt,
@@ -63,7 +63,7 @@ def llm_generate(prompt, debug=False):
     return response_data['response']
 
 def llm_chat(messages, tools=None, debug=False):
-    url = "http://localhost:11435/api/chat"
+    url = "http://localhost:11434/api/chat"
     payload = {
         "model": "llama3.2",
         "messages": messages,

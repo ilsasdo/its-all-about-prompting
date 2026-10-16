@@ -5,9 +5,9 @@ from utils import llm_generate, print_user, print_system, print_error, print_ass
 def chat(debug=False):
   # Llama 3.2 Chat tokens
   BEGIN = "<|begin_of_text|>"
-  START_HEADER = "<|start_header_id|>"
-  END_HEADER = "<|end_header_id|>\n\n"
-  EOT = "<|eot_id|>"
+  START_HEADER = "<|start_header_id|>" # role for message: system, user, assistant
+  END_HEADER = "<|end_header_id|>"
+  EOT = "<|eot_id|>" # end of conversation turn.
 
   history = BEGIN
   # Optional: system message
@@ -22,10 +22,11 @@ def chat(debug=False):
       break
 
     # Append user input to history with Llama 3 format
-    history += f"{START_HEADER}user{END_HEADER}{user_input}{EOT}"
+    # NOTICE: we are "inviting" the assistant to respond by adding the assistant header after the user input.
+    history += f"{START_HEADER}user{END_HEADER}{user_input}{EOT}{START_HEADER}assistant{END_HEADER}"
 
     try:
-      assistant_response = llm_generate(history + f"{START_HEADER}assistant{END_HEADER}", debug)
+      assistant_response = llm_generate(history, debug)
 
       print_system("Assistant: ", end="")
       print_assistant(assistant_response)
