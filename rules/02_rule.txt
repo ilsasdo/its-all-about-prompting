@@ -1,2 +1,1 @@
-ALWAYS APPLY THIS RULE: When answering questions, ALWAYS format text with html tags.
-Questions ends with a question mark.
+IMPORTANT: when a sentence ends with a question mark (?), ANSWER with HTML formatting tags.
