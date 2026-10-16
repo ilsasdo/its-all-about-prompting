@@ -4,7 +4,7 @@ import sys
 from utils import llm_generate, print_user, print_system, print_error, print_assistant
 
 # Load rules from filesystem
-def load_rules(rules_dir_path: str = "./rules") -> str:
+def load_rules(rules_dir_path: str = "./rules") -> list:
   rules_content = ["Follow these rules:"]
   rules_dir = Path(rules_dir_path)
   if rules_dir.exists():
@@ -13,9 +13,10 @@ def load_rules(rules_dir_path: str = "./rules") -> str:
       if content:
         rules_content.append(content)
 
-  if len(rules_content) > 1:
-    return "\n".join(rules_content)
-  return ""
+    if len(rules_content) > 1:
+      full_rules = "\n".join(rules_content)
+      return [{"role": "system", "content": full_rules}]
+  return []
 
 def serialize_history(history: list[dict[str, str]]) -> str:
   prompt = "<|begin_of_text|>"
@@ -27,10 +28,7 @@ def serialize_history(history: list[dict[str, str]]) -> str:
   return prompt + "<|start_header_id|>assistant<|end_header_id|>\n\n"
 
 def chat(debug=False):
-  history = []
-  rules = load_rules()
-  if rules:
-    history.append({"role": "system", "content": rules})
+  history = load_rules()
 
   print("Chat with LLM (type 'exit' or 'quit' to stop)")
 

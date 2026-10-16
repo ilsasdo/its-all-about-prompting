@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 from pathlib import Path
 import sys
-from utils import llm_chat, print_user, print_system, print_error, print_assistant
+from utils import llm_generate, print_user, print_system, print_error, print_assistant
 
+# Load rules from filesystem
 def load_rules(rules_dir_path: str = "./rules") -> list:
     rules_content = ["Follow these rules:"]
     rules_dir = Path(rules_dir_path)
@@ -17,16 +18,25 @@ def load_rules(rules_dir_path: str = "./rules") -> list:
         return [{"role": "system", "content": full_rules}]
     return []
 
+def serialize_history(history: list[dict[str, str]]) -> str:
+    prompt = "<|begin_of_text|>"
+    for message in history:
+        prompt += (
+            f"<|start_header_id|>{message['role']}<|end_header_id|>\n\n"
+            f"{message['content']}<|eot_id|>"
+        )
+    return prompt + "<|start_header_id|>assistant<|end_header_id|>\n\n"
+
 def chat(debug=False):
     history = load_rules()
     
     print("Chat with LLM (type 'exit' or 'quit' to stop, '/plan' to generate a plan, '/summarize' to summarize chat)")
-    
-    PLAN_PROMPT = """Analyze the task and provide a detailed step-by-step plan for its execution.
-Identify potential risks, dependencies, and key milestones.
-Format the output as a numbered list with clear explanations for each step."""
 
-    SUMMARIZE_PROMPT = """Summarize the current chat history into a concise yet detailed summary.
+    plan_prompt = """Analyze the task and provide a detailed step-by-step plan for its execution.
+    Identify potential risks, dependencies, and key milestones.
+    Format the output as a numbered list with clear explanations for each step."""
+
+    summarize_prompt = """Summarize the current chat history into a concise yet detailed summary.
 Retain the most relevant information and current task context.
 The summary will be used to reduce the context size, so it must capture the essence of the entire conversation."""
 
@@ -36,20 +46,19 @@ The summary will be used to reduce the context size, so it must capture the esse
         if user_input.lower() in ['exit', 'quit']:
             break
             
-        is_summarize = False
-        if user_input.strip().lower() == '/plan':
-            history.append({"role": "user", "content": PLAN_PROMPT})
-        elif user_input.strip().lower() == '/summarize':
-            history.append({"role": "user", "content": SUMMARIZE_PROMPT})
-            is_summarize = True
+        is_summarize = user_input.strip().lower() == '/summarize'
+        if is_summarize:
+            history.append({"role": "user", "content": summarize_prompt})
         else:
-            # Append user input to history
-            history.append({"role": "user", "content": user_input})
+            if user_input.strip().lower().startswith('/plan'):
+                history.append({"role": "user", "content": f"{plan_prompt}\n{user_input}"})
+            else:
+                # Append user input to history
+                history.append({"role": "user", "content": user_input})
         
         try:
-            response_data = llm_chat(history, debug=debug)
-            assistant_response = response_data['message']['content']
-            
+            assistant_response = llm_generate(serialize_history(history), debug=debug)
+
             print_system("Assistant: ", end="")
             print_assistant(assistant_response)
             
@@ -70,6 +79,3 @@ The summary will be used to reduce the context size, so it must capture the esse
 if __name__ == "__main__":
     debug = "--debug" in sys.argv
     chat(debug)
-
-# chats:
-# I want to build a simple chess engine in python. what should I do?
