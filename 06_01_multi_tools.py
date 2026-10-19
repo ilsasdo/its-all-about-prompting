@@ -35,9 +35,7 @@ def serialize_history(history: list[dict[str, str]]) -> str:
     return prompt + "<|start_header_id|>assistant<|end_header_id|>\n\n"
 
 def parse_tool_call(assistant_response: str, max_tool_calls: int = 10):
-    # Detect tool call
     try:
-        # Basic cleaning of the response to find JSON
         clean_response = assistant_response.strip()
         if "```json" in clean_response:
             clean_response = clean_response.split("```json")[1].split("```")[
@@ -46,14 +44,41 @@ def parse_tool_call(assistant_response: str, max_tool_calls: int = 10):
             clean_response = clean_response.split("```")[1].split("```")[
                 0].strip()
 
-        data = json.loads(clean_response)
+        try:
+            data = json.loads(clean_response)
+        except json.JSONDecodeError:
+            decoder = json.JSONDecoder()
+            data = []
+            offset = 0
+            while offset < len(clean_response):
+                while offset < len(clean_response) and clean_response[offset].isspace():
+                    offset += 1
+                if offset == len(clean_response):
+                    break
+
+                item, offset = decoder.raw_decode(clean_response, offset)
+                data.append(item)
+
+                while offset < len(clean_response) and clean_response[offset].isspace():
+                    offset += 1
+                if offset == len(clean_response):
+                    break
+                if clean_response[offset] != ";":
+                    raise json.JSONDecodeError(
+                        "Expected ';' between JSON objects",
+                        clean_response,
+                        offset,
+                    )
+                offset += 1
+
+            if len(data) < 2:
+                return {"role": "assistant", "content": assistant_response}
+
         if isinstance(data, dict):
             tool_calls = [data]
             return_list = False
         elif isinstance(data, list) and data and all(
-                isinstance(item, dict) and item.get("name") in (
-                    "read_file", "write_file", "search_file")
-                for item in data):
+                isinstance(item, dict) for item in data):
             tool_calls = data
             return_list = True
         else:
@@ -157,17 +182,15 @@ tools_prompt = """You have access to the following tools: 'read_file', 'write_fi
 1. 'read_file': Obtain the content of a file from disk.
    To use it, respond with a correct json: {"name": "read_file", "parameters": {"path": "FILE_PATH"}}
 
-2. 'write_file': Write content to a file on disk.
+2. 'write_file': Write content to a file on disk. Only refer to files mentioned by the user or previously found by 'search_file'.
    To use it, respond with a correct json: {"name": "write_file", "parameters": {"path": "FILE_PATH", "content": "FILE_CONTENT"}}
 
 3. 'search_file': search for a file on disk.
    To use it, respond with a correct json: {"name": "search_file", "parameters": {"path": "FILE_PATH", "file_name": "FILE_NAME"}}
 
 When you need to use a tool, provide the required parameters in the JSON object and ANSWER ONLY with a single valid JSON ARRAY string, example:
-[{"name": "search_file", "parameters": {"path": ".", "file_name": "my_file.txt"}}]
-
-You can answer with multiple TOOL CALLS, ALWAYS use JSON ARRAY format. Example:
-[{"name": "search_file", "parameters": {"path": ".", "file_name": "my_file.txt"}}, {"name": "read_file", "parameters": {"path": "my_file.txt"}}, {"name": "write_file", "parameters": {"path": "my_file.txt", "content": "Hello World"}}]
+GOOD ANSWER: [{"name": "search_file", "parameters": {"path": ".", "file_name": "my_file.txt"}}]
+BAD ANSWER: {"name": "search_file", "parameters": {"path": ".", "file_name": "my_file.txt"}}; {"name": "search_file", "parameters": {"path": ".", "file_name": "another_file.txt"}}
 
 If you are not calling a tool, do not use JSON format."""
 
