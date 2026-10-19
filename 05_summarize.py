@@ -57,7 +57,7 @@ The summary will be used to reduce the context size, so it must capture the esse
                 history.append({"role": "user", "content": user_input})
         
         try:
-            assistant_response = llm_generate(serialize_history(history), debug=debug)
+            assistant_response = llm_generate(serialize_history(history), raw=True, debug=debug)
 
             print_system("Assistant: ", end="")
             print_assistant(assistant_response)

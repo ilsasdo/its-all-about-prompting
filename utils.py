@@ -61,12 +61,13 @@ def llm_post_request(url, payload, debug=False, verbose=False):
     _print_token_usage(response_data)
     return response_data
 
-def llm_generate(prompt, debug=False, verbose=False):
+def llm_generate(prompt, raw=False, debug=False, verbose=False):
     url = "http://localhost:11434/api/generate"
     payload = {
         "model": "llama3.2",
         "prompt": prompt,
-        "stream": False
+        "stream": False,
+        "raw": raw
     }
     response_data = llm_post_request(url, payload, debug, verbose)
     return response_data['response']

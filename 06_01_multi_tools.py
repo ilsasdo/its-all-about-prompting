@@ -106,7 +106,7 @@ def parse_tool_call(assistant_response: str, max_tool_calls: int = 10):
                 else:
                     result = search_file(parameters.get("path"), parameters.get("file_name"))
                 print_debug(f"Tool result: {result}")
-            results.append({"role": "tool", "content": result})
+            results.append({"role": "ipython", "content": result})
 
         return results if return_list else results[0]
 
@@ -154,7 +154,7 @@ def generate_response(history: list[dict[str, str]], debug: bool = False) -> str
     """Generate a response, executing tool calls until the model responds normally."""
     tool_calls = 0
     while True:
-        assistant_response = llm_generate(serialize_history(history), debug=debug)
+        assistant_response = llm_generate(serialize_history(history), raw=True, debug=debug)
         parsed_responses = parse_tool_call(
             assistant_response,
             max_tool_calls=MAX_CONSECUTIVE_TOOL_CALLS - tool_calls,
@@ -162,7 +162,7 @@ def generate_response(history: list[dict[str, str]], debug: bool = False) -> str
         if not isinstance(parsed_responses, list):
             parsed_responses = [parsed_responses]
 
-        if parsed_responses[0]["role"] != "tool":
+        if parsed_responses[0]["role"] != "ipython":
             history.append(parsed_responses[0])
             return parsed_responses[0]["content"]
 
@@ -178,6 +178,7 @@ def generate_response(history: list[dict[str, str]], debug: bool = False) -> str
 
 
 tools_prompt = """You have access to the following tools: 'read_file', 'write_file' and 'search_file'.
+You can ONLY USE ONE TOOL AT A TIME. If you need to use multiple tools, you must call them in separate responses.
 
 1. 'read_file': Obtain the content of a file from disk.
    To use it, respond with a correct json: {"name": "read_file", "parameters": {"path": "FILE_PATH"}}
@@ -195,9 +196,9 @@ BAD ANSWER: {"name": "search_file", "parameters": {"path": ".", "file_name": "my
 If you are not calling a tool, do not use JSON format."""
 
 def chat(debug=False):
-    history = load_rules()
-    history.append({"role": "system", "content": tools_prompt})
-    
+    # history = load_rules()
+    history = [{"role": "system", "content": tools_prompt}]
+
     print("Chat with LLM (type 'exit' or 'quit' to stop, '/plan' to generate a plan, '/summarize' to summarize chat)")
 
     plan_prompt = """Analyze the task and provide a detailed step-by-step plan for its execution.
