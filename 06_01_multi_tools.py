@@ -118,6 +118,7 @@ def generate_response(history: list[dict[str, str]], debug: bool = False) -> str
             history.append(parsed_response)
             return parsed_response["content"]
 
+        history.append({"role": "assistant", "content": assistant_response})
         history.append(call_tool(parsed_response))
         tool_calls += 1
         if tool_calls >= MAX_CONSECUTIVE_TOOL_CALLS:
