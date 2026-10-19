@@ -86,7 +86,7 @@ def write_file(path: str, content: str) -> str:
     except Exception as e:
         return f"Error writing to file {path}: {e}"
 
-tools_prompt = """You have access to two tools: 'read_file' and 'write_file'.
+tools_prompt = """You have access to the following tools: 'read_file', 'write_file' and 'search_file'.
 
 1. 'read_file': Obtain the content of a file from disk.
    To use it, respond with a correct json: {"name": "read_file", "parameters": {"path": "FILE_PATH"}}
@@ -94,7 +94,13 @@ tools_prompt = """You have access to two tools: 'read_file' and 'write_file'.
 2. 'write_file': Write content to a file on disk.
    To use it, respond with a correct json: {"name": "write_file", "parameters": {"path": "FILE_PATH", "content": "FILE_CONTENT"}}
 
+3. 'search_file': search for a file on disk.
+   To use it, respond with a correct json: {"name": "search_file", "parameters": {"path": "FILE_PATH", "file_name": "FILE_NAME"}}
+
 When you need to use a tool, provide the required parameters in the JSON object and ANSWER ONLY with a single valid JSON string.
+You can answer with a JSON Array with multiple TOOL CALLS. Example:
+[{"name": "search_file", "parameters": {"path": ".", "file_name": "my_file.txt"}}, {"name": "read_file", "parameters": {"path": "my_file.txt"}}, {"name": "write_file", "parameters": {"path": "my_file.txt", "content": "Hello World"}}]
+
 If you are not calling a tool, do not use JSON format."""
 
 def chat(debug=False):
@@ -140,7 +146,7 @@ The summary will be used to reduce the context size, so it must capture the esse
                 history.append({"role": "assistant", "content": f"Summary of previous chat history:\n{tool_call}"})
             else:
                 # Append assistant response to history
-                history.append({"role": "assistant", "content": tool_call})
+                history.append({"role": "tool", "content": tool_call})
             
         except Exception as e:
             print_error(f"Error: {e}")
