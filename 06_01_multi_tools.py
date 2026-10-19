@@ -34,7 +34,8 @@ def serialize_history(history: list[dict[str, str]]) -> str:
         )
     return prompt + "<|start_header_id|>assistant<|end_header_id|>\n\n"
 
-def parse_tool_call(assistant_response: str, max_tool_calls: int = 10):
+def parse_tool_call(assistant_response: str) -> dict:
+    """Parse one tool call from the assistant response, or return the response as text."""
     try:
         clean_response = assistant_response.strip()
         if "```json" in clean_response:
@@ -44,74 +45,31 @@ def parse_tool_call(assistant_response: str, max_tool_calls: int = 10):
             clean_response = clean_response.split("```")[1].split("```")[
                 0].strip()
 
-        try:
-            data = json.loads(clean_response)
-        except json.JSONDecodeError:
-            decoder = json.JSONDecoder()
-            data = []
-            offset = 0
-            while offset < len(clean_response):
-                while offset < len(clean_response) and clean_response[offset].isspace():
-                    offset += 1
-                if offset == len(clean_response):
-                    break
-
-                item, offset = decoder.raw_decode(clean_response, offset)
-                data.append(item)
-
-                while offset < len(clean_response) and clean_response[offset].isspace():
-                    offset += 1
-                if offset == len(clean_response):
-                    break
-                if clean_response[offset] != ";":
-                    raise json.JSONDecodeError(
-                        "Expected ';' between JSON objects",
-                        clean_response,
-                        offset,
-                    )
-                offset += 1
-
-            if len(data) < 2:
-                return {"role": "assistant", "content": assistant_response}
-
-        if isinstance(data, dict):
-            tool_calls = [data]
-            return_list = False
-        elif isinstance(data, list) and data and all(
-                isinstance(item, dict) for item in data):
-            tool_calls = data
-            return_list = True
-        else:
+        data = json.loads(clean_response)
+        if not isinstance(data, dict) or data.get("name") not in (
+                "read_file", "write_file", "search_file"):
             return {"role": "assistant", "content": assistant_response}
-
-        if not all(call.get("name") in ("read_file", "write_file", "search_file")
-                   for call in tool_calls):
-            return {"role": "assistant", "content": assistant_response}
-
-        if max_tool_calls is not None:
-            tool_calls = tool_calls[:max_tool_calls]
-
-        results = []
-        for call in tool_calls:
-            tool_name = call["name"]
-            parameters = call.get("parameters", {})
-            if not isinstance(parameters, dict):
-                result = f"Error: Parameters for {tool_name} must be an object."
-            else:
-                print_debug(f"Tool call: {tool_name}({parameters})")
-                if tool_name == "read_file":
-                    result = read_file(parameters.get("path"))
-                elif tool_name == "write_file":
-                    result = write_file(parameters.get("path"), parameters.get("content"))
-                else:
-                    result = search_file(parameters.get("path"), parameters.get("file_name"))
-                print_debug(f"Tool result: {result}")
-            results.append({"role": "ipython", "content": result})
-
-        return results if return_list else results[0]
-
+        return data
     except (json.JSONDecodeError, IndexError):
         return {"role": "assistant", "content": assistant_response}
+
+
+def call_tool(tool_call: dict) -> dict[str, str]:
+    """Execute a parsed tool call and return its result as a chat message."""
+    tool_name = tool_call["name"]
+    parameters = tool_call.get("parameters", {})
+    if not isinstance(parameters, dict):
+        result = f"Error: Parameters for {tool_name} must be an object."
+    else:
+        print_debug(f"Tool call: {tool_name}({parameters})")
+        if tool_name == "read_file":
+            result = read_file(parameters.get("path"))
+        elif tool_name == "write_file":
+            result = write_file(parameters.get("path"), parameters.get("content"))
+        else:
+            result = search_file(parameters.get("path"), parameters.get("file_name"))
+        print_debug(f"Tool result: {result}")
+    return {"role": "ipython", "content": result}
 
 
 def read_file(path: str) -> str:
@@ -155,19 +113,13 @@ def generate_response(history: list[dict[str, str]], debug: bool = False) -> str
     tool_calls = 0
     while True:
         assistant_response = llm_generate(serialize_history(history), raw=True, debug=debug)
-        parsed_responses = parse_tool_call(
-            assistant_response,
-            max_tool_calls=MAX_CONSECUTIVE_TOOL_CALLS - tool_calls,
-        )
-        if not isinstance(parsed_responses, list):
-            parsed_responses = [parsed_responses]
+        parsed_response = parse_tool_call(assistant_response)
+        if "name" not in parsed_response:
+            history.append(parsed_response)
+            return parsed_response["content"]
 
-        if parsed_responses[0]["role"] != "ipython":
-            history.append(parsed_responses[0])
-            return parsed_responses[0]["content"]
-
-        history.extend(parsed_responses)
-        tool_calls += len(parsed_responses)
+        history.append(call_tool(parsed_response))
+        tool_calls += 1
         if tool_calls >= MAX_CONSECUTIVE_TOOL_CALLS:
             limit_message = (
                 f"Error: Maximum of {MAX_CONSECUTIVE_TOOL_CALLS} consecutive tool calls reached. "
@@ -189,8 +141,8 @@ You can ONLY USE ONE TOOL AT A TIME. If you need to use multiple tools, you must
 3. 'search_file': search for a file on disk.
    To use it, respond with a correct json: {"name": "search_file", "parameters": {"path": "FILE_PATH", "file_name": "FILE_NAME"}}
 
-When you need to use a tool, provide the required parameters in the JSON object and ANSWER ONLY with a single valid JSON ARRAY string, example:
-GOOD ANSWER: [{"name": "search_file", "parameters": {"path": ".", "file_name": "my_file.txt"}}]
+When you need to use a tool, provide the required parameters in the JSON object and ANSWER ONLY with a single valid JSON string, example:
+GOOD ANSWER: {"name": "search_file", "parameters": {"path": ".", "file_name": "my_file.txt"}}
 BAD ANSWER: {"name": "search_file", "parameters": {"path": ".", "file_name": "my_file.txt"}}; {"name": "search_file", "parameters": {"path": ".", "file_name": "another_file.txt"}}
 
 If you are not calling a tool, do not use JSON format."""
