@@ -1,8 +1,4 @@
 #!/usr/bin/env python3
-
-# PROMPT: read file "my_custom_file.txt" and write its content to foo.bar.txt file
-# SHOW: ollama show llama3.2 --template
-
 import json
 import sys
 from pathlib import Path
@@ -12,6 +8,9 @@ from utils import (
     llm_generate, print_user, print_system, print_error, print_assistant,
     print_debug, read_file, write_file, search_file,
 )
+
+# PROMPT: read file "my_custom_file.txt" and write its content to foo.bar.txt file
+# SHOW: ollama show llama3.2 --template
 
 # Load rules from filesystem
 def load_rules(rules_dir_path: str = "./rules") -> list:
@@ -77,8 +76,11 @@ def call_tool(tool_call: dict) -> dict[str, str]:
 
 def generate_response(history: list[dict[str, str]], debug: bool = False) -> str:
     """Generate a response, executing tool calls until the model responds normally."""
+    # NOTE: We limit the number of consecutive tool calls to prevent infinite loops or excessive tool usage.
     MAX_CONSECUTIVE_TOOL_CALLS = 10
     tool_calls = 0
+
+    # NOTE: A NESTED LOOP!
     while True:
         assistant_response = llm_generate(serialize_history(history), raw=True, debug=debug)
         history.append({"role": "assistant", "content": assistant_response})
