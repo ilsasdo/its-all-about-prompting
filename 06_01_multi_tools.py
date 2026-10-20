@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 # PROMPT: read file "my_custom_file.txt" and write its content to foo.bar.txt file
+# SHOW: ollama show llama3.2 --template
 
 import json
 import sys
