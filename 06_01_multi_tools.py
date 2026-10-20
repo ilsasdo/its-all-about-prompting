@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
+
+# PROMPT: read file "my_custom_file.txt" and write its content to foo.bar.txt file
+
 import json
 import sys
 from pathlib import Path
 from typing import Optional
-
-from keyring.backends import null
 
 from utils import llm_generate, print_user, print_system, print_error, print_assistant, print_debug
 
