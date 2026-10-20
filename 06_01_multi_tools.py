@@ -99,7 +99,8 @@ def generate_response(history: list[dict[str, str]], debug: bool = False) -> str
             return limit_message
 
 
-tools_prompt = """You have access to the following tools: 'read_file', 'write_file' and 'search_file'.
+tools_prompt = """You are an assistant that can execute file tools. To use a tool, output exactly one JSON object with name and parameters, and nothing else. After emitting a tool call, end your response. The program will execute it and provide its result in an ipython message. Never invent file contents or tool results. If a task requires reading before writing, request the read first and wait for its result before requesting the write. When finished, answer in plain text.
+You have access to the following tools: 'read_file', 'write_file' and 'search_file'.
 You can ONLY USE ONE TOOL AT A TIME. If you need to use multiple tools, you must call them in separate responses.
 
 1. 'read_file': Obtain the content of a file from disk.
@@ -113,16 +114,26 @@ You can ONLY USE ONE TOOL AT A TIME. If you need to use multiple tools, you must
 
 When you need to use a tool, provide the required parameters in the JSON object and ANSWER ONLY with a single valid JSON string, example:
 GOOD ANSWER: {"name": "search_file", "parameters": {"path": ".", "file_name": "my_file.txt"}}
-BAD ANSWER: {"name": "search_file", "parameters": {"path": ".", "file_name": "my_file.txt"}}; {"name": "search_file", "parameters": {"path": ".", "file_name": "another_file.txt"}}
 
 IMPORTANT: DO NOT COMBINE MULTIPLE TOOL CALLS IN A SINGLE RESPONSE.
 IMPORTANT: INVOKE A SINGLE FUNCTION THEN WAIT FOR THE RESULT BEFORE CALLING ANOTHER FUNCTION.
 
 If you are not calling a tool, do not use JSON format."""
+# tools_prompt = """
+# When you receive a tool call response, use the output to format an answer to the orginal user question.
+#
+# You are a helpful assistant with tool calling capabilities.
+# Given the following functions, please respond with a JSON for a function call with its proper arguments that best answers the given prompt.
+#
+# - read_file(path: str) -> str: Obtain the content of a file from disk.
+# - write_file(path: str, content: str) -> str: Write content to a file on disk. Only refer to files mentioned by the user or previously found by 'search_file'.
+# - search_file(path: str, file_name: str) -> str: Search for a file on disk
+#
+# Respond in the format {"name": function name, "parameters": dictionary of argument name and its value}. Do not use variables."""
 
 def chat(debug=False):
-    history = load_rules()
-    history.append({"role": "user", "content": tools_prompt})
+    history= [{"role": "system", "content": tools_prompt}]
+    # history = load_rules()
 
     print("Chat with LLM (type 'exit' or 'quit' to stop, '/plan' to generate a plan, '/summarize' to summarize chat)")
 
