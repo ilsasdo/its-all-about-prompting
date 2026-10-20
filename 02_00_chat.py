@@ -2,6 +2,8 @@
 import sys
 from utils import llm_chat, print_user, print_system, print_error, print_assistant
 
+# 1. llm_chat function -> https://docs.ollama.com/api/chat
+
 def chat(debug=False):
     history = []
     
@@ -13,17 +15,18 @@ def chat(debug=False):
         if user_input.lower() in ['exit', 'quit']:
             break
             
-        # Append user input to history
+        # NOTE: Append user input to history
         history.append({"role": "user", "content": user_input})
         
         try:
+            # NOTE: We pass the whole history
             response_data = llm_chat(history, debug=debug)
             assistant_response = response_data['message']['content']
             
             print_system("Assistant: ", end="")
             print_assistant(assistant_response)
             
-            # Append assistant response to history
+            # NOTE: Append assistant response to history
             history.append({"role": "assistant", "content": assistant_response})
             
         except Exception as e:

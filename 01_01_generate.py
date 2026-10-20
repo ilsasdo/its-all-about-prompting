@@ -5,6 +5,8 @@ from utils import llm_generate, print_assistant
 
 def main(debug=False):
     print("Welcome to 01_01_generate.py (type 'exit' or 'quit' to stop)")
+
+    # NOTE: Loop on user input
     while True:
         try:
           user_input = input("Prompt: ")

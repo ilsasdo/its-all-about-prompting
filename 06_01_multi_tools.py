@@ -25,7 +25,7 @@ def load_rules(rules_dir_path: str = "./rules") -> list:
     
     if len(rules_content) > 1:
         full_rules = "\n".join(rules_content)
-        return [{"role": "system", "content": full_rules}]
+        return [{"role": "user", "content": full_rules}]
     return []
 
 def serialize_history(history: list[dict[str, str]]) -> str:

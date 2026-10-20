@@ -2,6 +2,7 @@
 import sys
 from utils import llm_generate, print_user, print_system, print_error, print_assistant
 
+# NOTE: simple serializer ROLE: MESSAGE\n\n
 def serialize_history(history: list[dict[str, str]]) -> str:
   prompt = ""
   for message in history:
@@ -22,10 +23,11 @@ def chat(debug=False):
     if user_input.lower() in ['exit', 'quit']:
       break
 
-    # Append user input to history
+    # NOTE: we keep history
     history.append({"role": "user", "content": user_input})
 
     try:
+      # NOTE: back to llm_generate
       assistant_response = llm_generate(serialize_history(history), debug=debug)
 
       print_system("Assistant: ", end="")

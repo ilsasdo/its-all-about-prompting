@@ -3,7 +3,7 @@ from pathlib import Path
 import sys
 from utils import llm_generate, print_user, print_system, print_error, print_assistant
 
-# Load rules from filesystem
+# NOTE: We load rules from filesystem and add them as the first user message
 def load_rules(rules_dir_path: str = "./rules") -> list:
   rules_content = ["Follow these rules:"]
   rules_dir = Path(rules_dir_path)
@@ -15,7 +15,7 @@ def load_rules(rules_dir_path: str = "./rules") -> list:
 
     if len(rules_content) > 1:
       full_rules = "\n".join(rules_content)
-      return [{"role": "system", "content": full_rules}]
+      return [{"role": "user", "content": full_rules}]
   return []
 
 def serialize_history(history: list[dict[str, str]]) -> str:
