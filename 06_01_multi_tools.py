@@ -8,10 +8,10 @@ import sys
 from pathlib import Path
 from typing import Optional
 
-from utils import llm_generate, print_user, print_system, print_error, print_assistant, print_debug
-
-MAX_CONSECUTIVE_TOOL_CALLS = 10
-
+from utils import (
+    llm_generate, print_user, print_system, print_error, print_assistant,
+    print_debug, read_file, write_file, search_file,
+)
 
 # Load rules from filesystem
 def load_rules(rules_dir_path: str = "./rules") -> list:
@@ -75,44 +75,9 @@ def call_tool(tool_call: dict) -> dict[str, str]:
     return {"role": "ipython", "content": result}
 
 
-def read_file(path: str) -> str:
-    """Read the content of a file from disk."""
-    try:
-        return f"The following is the content of file {path}:\n\n{Path(path).read_text()}"
-    except Exception as e:
-        return f"Error reading file {path}: {e}"
-
-
-def write_file(path: str, content: str) -> str:
-    """Write content to a file on disk."""
-    try:
-        Path(path).write_text(content)
-        return f"File {path} written successfully."
-    except Exception as e:
-        return f"Error writing to file {path}: {e}"
-
-
-def search_file(path: str, file_name: str) -> str:
-    """Find files named file_name beneath the given directory."""
-    try:
-        search_path = Path(path).resolve()
-        if not search_path.is_dir():
-            return f"Error searching for {file_name}: {path} is not a directory."
-
-        matches = sorted(
-            candidate for candidate in search_path.rglob(file_name)
-            if candidate.is_file()
-        )
-        if not matches:
-            return f"No files named {file_name} found under {path}."
-
-        return "Found files:\n" + "\n".join(str(match) for match in matches)
-    except Exception as e:
-        return f"Error searching for {file_name} under {path}: {e}"
-
-
 def generate_response(history: list[dict[str, str]], debug: bool = False) -> str:
     """Generate a response, executing tool calls until the model responds normally."""
+    MAX_CONSECUTIVE_TOOL_CALLS = 10
     tool_calls = 0
     while True:
         assistant_response = llm_generate(serialize_history(history), raw=True, debug=debug)

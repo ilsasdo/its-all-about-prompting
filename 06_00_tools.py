@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
+from pathlib import Path
 import json
 import sys
-from pathlib import Path
+from typing import Optional
 
-from keyring.backends import null
-
-from utils import llm_generate, print_user, print_system, print_error, print_assistant, print_debug
+from utils import (
+    llm_generate, print_user, print_system, print_error, print_assistant,
+    print_debug, read_file, write_file, search_file,
+)
 
 # Load rules from filesystem
 def load_rules(rules_dir_path: str = "./rules") -> list:
@@ -31,10 +33,10 @@ def serialize_history(history: list[dict[str, str]]) -> str:
         )
     return prompt + "<|start_header_id|>assistant<|end_header_id|>\n\n"
 
-def parse_tool_call(assistant_response: str):
-    # Detect tool call
+
+def parse_tool_call(assistant_response: str) -> Optional[dict]:
+    """Parse one tool call from the assistant response, or return the response as text."""
     try:
-        # Basic cleaning of the response to find JSON
         clean_response = assistant_response.strip()
         if "```json" in clean_response:
             clean_response = clean_response.split("```json")[1].split("```")[
@@ -44,68 +46,56 @@ def parse_tool_call(assistant_response: str):
                 0].strip()
 
         data = json.loads(clean_response)
-        if isinstance(data, dict) and (
-                data.get("name") == "read_file" or data.get(
-            "name") == "write_file"):
-            tool_name = data["name"]
-            parameters = data.get("parameters", {})
-
-            print_debug(f"Tool call: {tool_name}({parameters})")
-
-            if tool_name == "read_file":
-                result = read_file(parameters.get("path"))
-            elif tool_name == "write_file":
-                result = write_file(parameters.get("path"), parameters.get("content"))
-            else:
-                result = f"Error: Tool {tool_name} not found."
-
-            print_debug(f"Tool result: {result}")
-
-            # Append assistant tool call and system result to history
-            return result
-        else:
-            return assistant_response
-
+        if not isinstance(data, dict) or data.get("name") not in (
+                "read_file", "write_file", "search_file"):
+            return None
+        return data
     except (json.JSONDecodeError, IndexError):
-        return assistant_response
+        return None
 
 
-def read_file(path: str) -> str:
-    """Read the content of a file from disk."""
-    try:
-        return f"The following is the content of file {path}:\n\n{Path(path).read_text()}"
-    except Exception as e:
-        return f"Error reading file {path}: {e}"
+def call_tool(tool_call: dict) -> dict[str, str]:
+    """Execute a parsed tool call and return its result as a chat message."""
+    tool_name = tool_call["name"]
+    parameters = tool_call.get("parameters", {})
+    if not isinstance(parameters, dict):
+        result = f"Error: Parameters for {tool_name} must be an object."
+    else:
+        print_debug(f"Tool call: {tool_name}({parameters})")
+        if tool_name == "read_file":
+            result = read_file(parameters.get("path"))
+        elif tool_name == "write_file":
+            result = write_file(parameters.get("path"), parameters.get("content"))
+        else:
+            result = search_file(parameters.get("path"), parameters.get("file_name"))
+        print_debug(f"Tool result: {result}")
+    return {"role": "ipython", "content": result}
 
-
-def write_file(path: str, content: str) -> str:
-    """Write content to a file on disk."""
-    try:
-        Path(path).write_text(content)
-        return f"File {path} written successfully."
-    except Exception as e:
-        return f"Error writing to file {path}: {e}"
 
 tools_prompt = """You have access to the following tools: 'read_file', 'write_file' and 'search_file'.
+You can ONLY USE ONE TOOL AT A TIME. If you need to use multiple tools, you must call them in separate responses.
 
 1. 'read_file': Obtain the content of a file from disk.
    To use it, respond with a correct json: {"name": "read_file", "parameters": {"path": "FILE_PATH"}}
 
-2. 'write_file': Write content to a file on disk.
+2. 'write_file': Write content to a file on disk. Only refer to files mentioned by the user or previously found by 'search_file'.
    To use it, respond with a correct json: {"name": "write_file", "parameters": {"path": "FILE_PATH", "content": "FILE_CONTENT"}}
 
 3. 'search_file': search for a file on disk.
    To use it, respond with a correct json: {"name": "search_file", "parameters": {"path": "FILE_PATH", "file_name": "FILE_NAME"}}
 
-When you need to use a tool, provide the required parameters in the JSON object and ANSWER ONLY with a single valid JSON string.
-You can answer with a JSON Array with multiple TOOL CALLS. Example:
-[{"name": "search_file", "parameters": {"path": ".", "file_name": "my_file.txt"}}, {"name": "read_file", "parameters": {"path": "my_file.txt"}}, {"name": "write_file", "parameters": {"path": "my_file.txt", "content": "Hello World"}}]
+When you need to use a tool, provide the required parameters in the JSON object and ANSWER ONLY with a single valid JSON string, example:
+GOOD ANSWER: {"name": "search_file", "parameters": {"path": ".", "file_name": "my_file.txt"}}
+BAD ANSWER: {"name": "search_file", "parameters": {"path": ".", "file_name": "my_file.txt"}}; {"name": "search_file", "parameters": {"path": ".", "file_name": "another_file.txt"}}
+
+IMPORTANT: DO NOT COMBINE MULTIPLE TOOL CALLS IN A SINGLE RESPONSE.
+IMPORTANT: INVOKE A SINGLE FUNCTION THEN WAIT FOR THE RESULT BEFORE CALLING ANOTHER FUNCTION.
 
 If you are not calling a tool, do not use JSON format."""
 
 def chat(debug=False):
     history = load_rules()
-    history.append({"role": "system", "content": tools_prompt})
+    history.append({"role": "user", "content": tools_prompt})
     
     print("Chat with LLM (type 'exit' or 'quit' to stop, '/plan' to generate a plan, '/summarize' to summarize chat)")
 
