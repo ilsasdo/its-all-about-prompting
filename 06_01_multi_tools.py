@@ -98,7 +98,7 @@ def generate_response(history: list[dict[str, str]], debug: bool = False) -> str
             history.append({"role": "assistant", "content": limit_message})
             return limit_message
 
-
+# NOTE: I tried multiple prompts to get one right
 tools_prompt = """You are an assistant that can execute file tools. To use a tool, output exactly one JSON object with name and parameters, and nothing else. After emitting a tool call, end your response. The program will execute it and provide its result in an ipython message. Never invent file contents or tool results. If a task requires reading before writing, request the read first and wait for its result before requesting the write. When finished, answer in plain text.
 You have access to the following tools: 'read_file', 'write_file' and 'search_file'.
 You can ONLY USE ONE TOOL AT A TIME. If you need to use multiple tools, you must call them in separate responses.
@@ -121,7 +121,9 @@ IMPORTANT: INVOKE A SINGLE FUNCTION THEN WAIT FOR THE RESULT BEFORE CALLING ANOT
 If you are not calling a tool, do not use JSON format."""
 
 def chat(debug=False):
+    # NOTE: we set the tool prompt a system to try give it an higher priority
     history= [{"role": "system", "content": tools_prompt}]
+    # NOTE: also, we remove rules to avoid noise
     # history = load_rules()
 
     print("Chat with LLM (type 'exit' or 'quit' to stop, '/plan' to generate a plan, '/summarize' to summarize chat)")
