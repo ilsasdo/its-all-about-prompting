@@ -36,6 +36,7 @@ def chat(debug=False):
     Identify potential risks, dependencies, and key milestones.
     Format the output as a numbered list with clear explanations for each step."""
 
+    # NOTE: compacting/summarizing is just another prompt!
     summarize_prompt = """Summarize the current chat history into a concise yet detailed summary.
 Retain the most relevant information and current task context.
 The summary will be used to reduce the context size, so it must capture the essence of the entire conversation."""
@@ -45,7 +46,7 @@ The summary will be used to reduce the context size, so it must capture the esse
         user_input = input()
         if user_input.lower() in ['exit', 'quit']:
             break
-            
+
         is_summarize = user_input.strip().lower() == '/summarize'
         if is_summarize:
             history.append({"role": "user", "content": summarize_prompt})
@@ -61,9 +62,10 @@ The summary will be used to reduce the context size, so it must capture the esse
 
             print_system("Assistant: ", end="")
             print_assistant(assistant_response)
-            
+
+            # NOTE: we clear up the history!
             if is_summarize:
-                # Replace history with the summary while keeping rules
+                # NOTE: Replace history with the summary while keeping rules
                 history = load_rules()
                 history.append({"role": "assistant", "content": f"Summary of previous chat history:\n{assistant_response}"})
             else:

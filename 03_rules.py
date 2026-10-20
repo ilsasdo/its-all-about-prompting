@@ -28,6 +28,8 @@ def serialize_history(history: list[dict[str, str]]) -> str:
   return prompt + "<|start_header_id|>assistant<|end_header_id|>\n\n"
 
 def chat(debug=False):
+  # NOTE: we initiate history with the rules
+  # "Skills" are rules conditionally loaded!
   history = load_rules()
 
   print("Chat with LLM (type 'exit' or 'quit' to stop)")

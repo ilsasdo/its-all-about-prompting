@@ -32,6 +32,7 @@ def chat(debug=False):
 
   print("Chat with LLM (type 'exit' or 'quit' to stop, '/plan' to generate a plan)")
 
+  # NOTE: the plan is just another prompt!
   plan_prompt = """Analyze the task and provide a detailed step-by-step plan for its execution.
 Identify potential risks, dependencies, and key milestones.
 Format the output as a numbered list with clear explanations for each step."""
@@ -42,6 +43,8 @@ Format the output as a numbered list with clear explanations for each step."""
     if user_input.lower() in ['exit', 'quit']:
       break
 
+    # NOTE: we detect the "command" and apply the new prompt
+    # "Custom commands" are "prebuilt" prompts.
     if user_input.strip().lower().startswith('/plan'):
       history.append({"role": "user", "content": f"{plan_prompt}\n{user_input}"})
     else:

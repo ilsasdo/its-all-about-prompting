@@ -34,6 +34,7 @@ def serialize_history(history: list[dict[str, str]]) -> str:
     return prompt + "<|start_header_id|>assistant<|end_header_id|>\n\n"
 
 
+# NOTE: the model is a String -> String function and not a predictable one
 def parse_tool_call(assistant_response: str) -> Optional[dict]:
     """Parse one tool call from the assistant response, or return the response as text."""
     try:
@@ -54,6 +55,7 @@ def parse_tool_call(assistant_response: str) -> Optional[dict]:
         return None
 
 
+# NOTE: our Agent calls tools/MCP/other agents...
 def call_tool(tool_call: dict) -> dict[str, str]:
     """Execute a parsed tool call and return its result as a chat message."""
     tool_name = tool_call["name"]
@@ -72,6 +74,7 @@ def call_tool(tool_call: dict) -> dict[str, str]:
     return {"role": "ipython", "content": result}
 
 
+# NOTE: Oh no! Another prompt!
 tools_prompt = """You have access to the following tools: 'read_file', 'write_file' and 'search_file'.
 You can ONLY USE ONE TOOL AT A TIME. If you need to use multiple tools, you must call them in separate responses.
 
@@ -125,18 +128,26 @@ The summary will be used to reduce the context size, so it must capture the esse
         
         try:
             assistant_response = llm_generate(serialize_history(history), raw=True, debug=debug)
+            history.append({"role": "assistant", "content": assistant_response})
+
             tool_call = parse_tool_call(assistant_response)
+            if tool_call is not None:
+                tool_result = call_tool(tool_call)
+                print_system("Tool Result: ", end="")
+                print_assistant(tool_result["content"])
+                # Append tool result to history
+                history.append(tool_result)
 
             print_system("Assistant: ", end="")
-            print_assistant(tool_call)
+            print_assistant(assistant_response)
             
             if is_summarize:
                 # Replace history with the summary while keeping rules
                 history = load_rules()
-                history.append({"role": "assistant", "content": f"Summary of previous chat history:\n{tool_call}"})
+                history.append({"role": "assistant", "content": f"Summary of previous chat history:\n{assistant_response}"})
             else:
                 # Append assistant response to history
-                history.append({"role": "tool", "content": tool_call})
+                history.append({"role": "assistant", "content": assistant_response})
             
         except Exception as e:
             print_error(f"Error: {e}")
