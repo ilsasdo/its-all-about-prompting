@@ -119,17 +119,6 @@ IMPORTANT: DO NOT COMBINE MULTIPLE TOOL CALLS IN A SINGLE RESPONSE.
 IMPORTANT: INVOKE A SINGLE FUNCTION THEN WAIT FOR THE RESULT BEFORE CALLING ANOTHER FUNCTION.
 
 If you are not calling a tool, do not use JSON format."""
-# tools_prompt = """
-# When you receive a tool call response, use the output to format an answer to the orginal user question.
-#
-# You are a helpful assistant with tool calling capabilities.
-# Given the following functions, please respond with a JSON for a function call with its proper arguments that best answers the given prompt.
-#
-# - read_file(path: str) -> str: Obtain the content of a file from disk.
-# - write_file(path: str, content: str) -> str: Write content to a file on disk. Only refer to files mentioned by the user or previously found by 'search_file'.
-# - search_file(path: str, file_name: str) -> str: Search for a file on disk
-#
-# Respond in the format {"name": function name, "parameters": dictionary of argument name and its value}. Do not use variables."""
 
 def chat(debug=False):
     history= [{"role": "system", "content": tools_prompt}]
