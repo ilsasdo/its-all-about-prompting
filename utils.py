@@ -67,7 +67,8 @@ def llm_generate(prompt, raw=False, debug=False, verbose=False):
         "model": "llama3.2",
         "prompt": prompt,
         "stream": False,
-        "raw": raw
+        "raw": raw,
+        "temperature": 0.2
     }
     response_data = llm_post_request(url, payload, debug, verbose)
     return response_data['response']

@@ -2,6 +2,7 @@
 import json
 import sys
 from pathlib import Path
+from typing import Optional
 
 from keyring.backends import null
 
@@ -34,7 +35,7 @@ def serialize_history(history: list[dict[str, str]]) -> str:
         )
     return prompt + "<|start_header_id|>assistant<|end_header_id|>\n\n"
 
-def parse_tool_call(assistant_response: str) -> dict:
+def parse_tool_call(assistant_response: str) -> Optional[dict]:
     """Parse one tool call from the assistant response, or return the response as text."""
     try:
         clean_response = assistant_response.strip()
@@ -48,10 +49,10 @@ def parse_tool_call(assistant_response: str) -> dict:
         data = json.loads(clean_response)
         if not isinstance(data, dict) or data.get("name") not in (
                 "read_file", "write_file", "search_file"):
-            return {"role": "assistant", "content": assistant_response}
+            return None
         return data
     except (json.JSONDecodeError, IndexError):
-        return {"role": "assistant", "content": assistant_response}
+        return None
 
 
 def call_tool(tool_call: dict) -> dict[str, str]:
@@ -92,7 +93,7 @@ def write_file(path: str, content: str) -> str:
 def search_file(path: str, file_name: str) -> str:
     """Find files named file_name beneath the given directory."""
     try:
-        search_path = Path(path)
+        search_path = Path(path).resolve()
         if not search_path.is_dir():
             return f"Error searching for {file_name}: {path} is not a directory."
 
@@ -113,12 +114,11 @@ def generate_response(history: list[dict[str, str]], debug: bool = False) -> str
     tool_calls = 0
     while True:
         assistant_response = llm_generate(serialize_history(history), raw=True, debug=debug)
-        parsed_response = parse_tool_call(assistant_response)
-        if "name" not in parsed_response:
-            history.append(parsed_response)
-            return parsed_response["content"]
-
         history.append({"role": "assistant", "content": assistant_response})
+        parsed_response = parse_tool_call(assistant_response)
+        if parsed_response is None:
+            return assistant_response
+
         history.append(call_tool(parsed_response))
         tool_calls += 1
         if tool_calls >= MAX_CONSECUTIVE_TOOL_CALLS:
@@ -146,11 +146,15 @@ When you need to use a tool, provide the required parameters in the JSON object 
 GOOD ANSWER: {"name": "search_file", "parameters": {"path": ".", "file_name": "my_file.txt"}}
 BAD ANSWER: {"name": "search_file", "parameters": {"path": ".", "file_name": "my_file.txt"}}; {"name": "search_file", "parameters": {"path": ".", "file_name": "another_file.txt"}}
 
+DO NOT COMBINE MULTIPLE TOOL CALLS IN A SINGLE RESPONSE.
+
+INVOKE A SINGLE FUNCTION THEN WAIT FOR THE RESULT BEFORE CALLING ANOTHER FUNCTION.
+
 If you are not calling a tool, do not use JSON format."""
 
 def chat(debug=False):
-    # history = load_rules()
-    history = [{"role": "system", "content": tools_prompt}]
+    history = load_rules()
+    history.append({"role": "user", "content": tools_prompt})
 
     print("Chat with LLM (type 'exit' or 'quit' to stop, '/plan' to generate a plan, '/summarize' to summarize chat)")
 
