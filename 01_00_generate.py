@@ -6,4 +6,4 @@ from utils import llm_generate, print_assistant
 
 if __name__ == "__main__":
     debug = "--debug" in sys.argv
-    print_assistant(llm_generate('Explain in one sentence why Java is a better language than JavaScript.', debug))
+    print_assistant(llm_generate('Explain in one sentence why Java is a better language than JavaScript. Make it a joke.', debug))
